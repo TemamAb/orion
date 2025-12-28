@@ -1,0 +1,8 @@
+
+{
+  "name": "AION Flash Loan Production Dashboard",
+  "description": "Professional-grade infrastructure monitoring for flash loan activity and profit settlement with Ethers.js integration.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
