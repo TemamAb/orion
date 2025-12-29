@@ -3,37 +3,33 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const DASHBOARD_PATH = path.join(__dirname, 'myneon', 'monitoring', 'production', 'PRODUCTIONDASHBOARD.HTML.html');
+const DASHBOARD = path.join(__dirname, 'myneon', 'monitoring', 'production', 'PRODUCTIONDASHBOARD.HTML.html');
 
 const server = http.createServer((req, res) => {
-  // Always serve the dashboard
-  fs.readFile(DASHBOARD_PATH, (err, data) => {
+  fs.readFile(DASHBOARD, 'utf8', (err, data) => {
     if (err) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, {'Content-Type': 'text/html'});
       res.end(`
-        <html>
-          <body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">
-            <h1>íº€ Dashboard Loading...</h1>
-            <p>Production dashboard initializing</p>
-            <p>Path: ${DASHBOARD_PATH}</p>
-            <p><small>All mock data removed - Ready for live integration</small></p>
-          </body>
-        </html>
+        <html><body style="font-family: monospace; background: black; color: lime; padding: 40px;">
+          <h1>íº€ AION DASHBOARD</h1>
+          <p>âœ… ALL MOCK DATA REMOVED</p>
+          <p>í´¥ READY FOR PRODUCTION</p>
+          <p>Path: ${DASHBOARD}</p>
+        </body></html>
       `);
       return;
     }
     
     res.writeHead(200, {
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': 'no-cache, no-store, must-revalidate'
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache'
     });
     res.end(data);
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`âœ… Production Dashboard Server running on port ${PORT}`);
-  console.log(`í³Š Serving: ${DASHBOARD_PATH}`);
-  console.log(`í¾¯ All mock data removed - Metrics reset to zero`);
-  console.log(`íº€ Ready for blockchain data integration`);
+  console.log(`í´¥ PRODUCTION DASHBOARD LIVE: http://localhost:${PORT}`);
+  console.log(`âœ… ALL MOCK DATA REMOVED`);
+  console.log(`íº€ Ready for blockchain integration`);
 });

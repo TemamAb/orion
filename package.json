@@ -1,10 +1,10 @@
 {
-  "name": "production-dashboard",
+  "name": "aion-dashboard",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'Static dashboard - no build needed'"
+    "build": "echo 'Production dashboard ready'"
   },
   "engines": {
     "node": ">=16.0.0"

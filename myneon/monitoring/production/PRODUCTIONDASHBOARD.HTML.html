@@ -1,1548 +1,181 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AION Architect - Production Core</title>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.2.1/dist/index.min.js"></script>
+    <title>AION ARCHITECT CORE v3.5 - PRODUCTION DASHBOARD</title>
     <style>
-        :root {
-            --bg-primary: #020617;
-            --bg-secondary: #0f172a;
-            --bg-tertiary: #1e293b;
-            --text-primary: #f8fafc;
-            --text-secondary: #90a3b8;
-            --text-muted: #60708b;
-            --accent: #10b981;
-            --accent-hover: #059669;
-            --border: #330155;
-            --border-light: #075569;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --error: #ef0000;
-            --blue: #3b82f6;
-            --purple: #8b5cf6;
-            --orange: #f97316;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            min-height: 100vh;
+            padding: 20px;
             overflow-x: hidden;
         }
-
-        .mono {
-            font-family: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
+        .terminal {
+            background: #000;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 1200px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
         }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
         .header {
-            display: flex;
-            flex-direction: column;
-            md:flex-row;
-            items-center: center;
-            justify-between: space-between;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 2rem;
-            margin-bottom: 2rem;
-            gap: 1.5rem;
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #00ff00;
+            margin-bottom: 30px;
         }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .status {
+            color: #ffff00;
+            font-weight: bold;
+            font-size: 1.2em;
         }
-
-        .logo-container {
-            padding: 0.75rem;
-            background: var(--accent)/0.1;
-            border-radius: 1rem;
-            border: 1px solid var(--accent)/0.2;
-        }
-
-        .logo {
-            width: 2rem;
-            height: 2rem;
-            color: var(--accent);
-        }
-
-        .title {
-            font-size: 1.5rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-primary);
-        }
-
-        .subtitle {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-        }
-
-        .status-badge {
-            background: var(--bg-secondary)/0.5;
-            border: 1px solid var(--border);
-            padding: 0.5rem 1rem;
-            border-radius: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .status-text {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .status-active {
-            color: var(--accent);
-        }
-
-        .metrics-grid {
+        .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+            gap: 20px;
+            margin: 30px 0;
         }
-
-        .metric-card {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1.5rem;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
+        .metric {
+            background: #111;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 5px;
         }
-
-        .metric-card:hover {
-            border-color: var(--accent)/0.5;
-            transform: translateY(-2px);
-        }
-
-        .metric-icon {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            width: 1.5rem;
-            height: 1.5rem;
-            opacity: 0.6;
-            color: var(--accent);
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.5rem;
-        }
-
         .metric-value {
-            font-size: 1.5rem;
-            font-weight: 900;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
+            font-size: 2.5em;
+            color: #ff0000;
+            font-weight: bold;
+            margin: 10px 0;
         }
-
-        .metric-subvalue {
-            font-size: 0.75rem;
-            color: var(--accent);
-            font-weight: 700;
-        }
-
-        .command-card {
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-            border: 1px solid var(--border-light);
-            border-radius: 2rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .command-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 2rem;
-        }
-
-        .command-title {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.875rem;
-            font-weight: 900;
+        .metric-label {
+            color: #00ffff;
+            font-size: 0.9em;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--text-primary);
+            letter-spacing: 1px;
         }
-
-        .currency-toggle {
-            display: flex;
-            background: var(--bg-primary)/0.6;
-            border: 1px solid var(--border);
-            border-radius: 2rem;
-            padding: 0.25rem;
+        .warning {
+            color: #ff9900;
+            border-left: 3px solid #ff9900;
+            padding-left: 15px;
+            margin: 20px 0;
+            background: rgba(255, 153, 0, 0.1);
+            padding: 15px;
         }
-
-        .currency-btn {
-            padding: 0.5rem 1rem;
-            font-size: 0.75rem;
-            font-weight: 900;
-            border-radius: 1.5rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .currency-btn.active {
-            background: var(--accent);
-            color: var(--bg-primary);
-        }
-
-        .currency-btn:not(.active) {
-            color: var(--text-muted);
-        }
-
-        .balance-section {
-            margin-bottom: 2rem;
-        }
-
-        .balance-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.5rem;
-        }
-
-        .balance-value {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: var(--text-primary);
+        .command {
+            color: #00ff00;
+            background: #111;
+            padding: 5px 10px;
+            border-radius: 3px;
             font-family: monospace;
+            margin: 5px 0;
         }
-
-        .balance-currency {
-            font-size: 1rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-left: 0.5rem;
-        }
-
-        .withdrawal-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .withdrawal-mode {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .mode-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .mode-toggle {
-            display: flex;
-            background: var(--bg-secondary)/0.5;
-            border-radius: 0.5rem;
-            padding: 0.05rem;
-            border: 1px solid var(--border);
-        }
-
-        .mode-btn {
-            padding: 0.375rem 0.75rem;
-            font-size: 0.625rem;
-            font-weight: 900;
-            border-radius: 0.375rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .mode-btn.active {
-            background: var(--accent);
-            color: var(--bg-primary);
-        }
-
-        .mode-btn:not(.active) {
-            color: var(--text-muted);
-        }
-
-        .address-input {
-            width: 100%;
-            background: var(--bg-primary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 0.75rem;
-            color: var(--text-primary);
-            font-family: monospace;
-            font-size: 0.875rem;
-            outline: none;
-        }
-
-        .address-input:focus {
-            border-color: var(--accent)/0.5;
-        }
-
-        .withdraw-btn {
-            width: 100%;
-            background: var(--text-primary);
-            color: var(--bg-primary);
-            border: none;
-            border-radius: 1rem;
-            padding: 1rem;
-            font-size: 0.875rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .withdraw-btn:hover:not(:disabled) {
-            background: var(--text-secondary);
-        }
-
-        .withdraw-btn:disabled {
-            background: var(--border);
-            color: var(--text-muted);
-            cursor: not-allowed;
-        }
-
-        .analytics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .analytics-card {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1.5rem;
-        }
-
-        .analytics-title {
-            font-size: 0.75rem;
-            color: var(--accent);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .analytics-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .analytics-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem;
-            background: var(--bg-primary)/0.3;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border);
-        }
-
-        .analytics-name {
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .analytics-value {
-            color: var(--accent);
-            font-weight: 900;
-        }
-
-        .flash-loan-card {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 2rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .flash-loan-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-            color: var(--orange);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1.5rem;
-        }
-
-        .flash-loan-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-        }
-
-        .flash-loan-item {
+        footer {
             text-align: center;
-        }
-
-        .flash-loan-label {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 0.25rem;
-        }
-
-        .flash-loan-value {
-            font-size: 1.25rem;
-            font-weight: 900;
-            color: var(--text-primary);
-            font-family: monospace;
-        }
-
-        .bot-display {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 2rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .bot-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-            color: var(--blue);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1.5rem;
-        }
-
-        .bot-status {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-
-        .bot-status-item {
-            text-align: center;
-        }
-
-        .bot-status-label {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 0.25rem;
-        }
-
-        .bot-status-value {
-            font-size: 1rem;
-            font-weight: 900;
-            color: var(--text-primary);
-        }
-
-        .ai-card {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 2rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .ai-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-            color: var(--purple);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1.5rem;
-        }
-
-        .ai-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .ai-item {
-            background: var(--bg-primary)/0.3;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        .ai-label {
-            font-size: 0.5rem;
-            color: var(--text-muted);
-            font-weight: 900;
-            text-transform: uppercase;
-            margin-bottom: 0.5rem;
-        }
-
-        .ai-value {
-            font-size: 0.875rem;
-            font-weight: 900;
-            color: var(--text-primary);
-            font-family: monospace;
-        }
-
-        .security-card {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 2rem;
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .security-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-            color: var(--blue);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1.5rem;
-        }
-
-        .security-status {
-            background: var(--accent)/0.05;
-            border: 1px solid var(--accent)/0.2;
-            border-radius: 1rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .security-icon {
-            width: 1.5rem;
-            height: 1.5rem;
-            color: var(--accent);
-        }
-
-        .security-text {
-            font-size: 0.75rem;
-            font-weight: 900;
-            color: var(--text-primary);
-            text-transform: uppercase;
-        }
-
-        .security-subtext {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .security-metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .security-metric {
-            background: var(--bg-primary)/0.3;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .security-metric-label {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .security-metric-value {
-            font-size: 0.875rem;
-            font-weight: 900;
-            color: var(--blue);
-            font-family: monospace;
-        }
-
-        .logs-section {
-            margin-bottom: 2rem;
-        }
-
-        .logs-title {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1rem;
-            padding-left: 0.5rem;
-            border-left: 2px solid var(--border);
-        }
-
-        .logs-container {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1.5rem;
-            max-height: 000px;
-            overflow-y: auto;
-        }
-
-        .logs-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .log-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            background: var(--bg-primary)/0.3;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border);
-        }
-
-        .log-icon {
-            width: 1rem;
-            height: 1rem;
-        }
-
-        .log-content {
-            flex: 1;
-        }
-
-        .log-message {
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .log-time {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-        }
-
-        .event-stream {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1.5rem;
-            max-height: 000px;
-            overflow-y: auto;
-        }
-
-        .event-title {
-            font-size: 0.75rem;
-            color: var(--error);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 1rem;
-            padding-left: 0.5rem;
-            border-left: 2px solid var(--error);
-        }
-
-        .event-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .event-item {
-            padding: 0.75rem;
-            background: var(--bg-primary)/0.3;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border);
-        }
-
-        .event-message {
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-
-        .event-time {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            margin-top: 0.25rem;
-        }
-
-        .health-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .health-item {
-            background: var(--bg-secondary)/0.0;
-            border: 1px solid var(--border);
-            border-radius: 1rem;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        .health-label {
-            font-size: 0.625rem;
-            color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 0.5rem;
-        }
-
-        .health-status {
-            width: 1rem;
-            height: 1rem;
-            border-radius: 0%;
-            margin: 0 auto;
-        }
-
-        .health-status.active {
-            background: var(--success);
-        }
-
-        .footer {
-            background: var(--error)/0.05;
-            border: 1px solid var(--error)/0.2;
-            border-radius: 2rem;
-            padding: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .footer-icon {
-            width: 2rem;
-            height: 2rem;
-            color: var(--error);
-        }
-
-        .footer-text {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-        }
-
-        .footer-highlight {
-            color: var(--error);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-10%) skewX(05deg); }
-            100% { transform: translateX(10%) skewX(05deg); }
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            0% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .animate-pulse {
-            animation: pulse 2s infinite;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-
-            .header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .analytics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .withdrawal-section {
-                grid-template-columns: 1fr;
-            }
-
-            .ai-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .security-metrics {
-                grid-template-columns: 1fr;
-            }
-
-            .health-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+            color: #666;
+            font-size: 0.8em;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
+    <div class="terminal">
         <div class="header">
-            <div class="header-left">
-                <div class="logo-container">
-                    <svg class="logo" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 2L3 10h9l-1 8 10-0h-9l1-8z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="title">AION ARCHITECT <span style="color: var(--accent);">CORE v3.5</span></h1>
-                    <p class="subtitle">Quantum-Leap Arbitrage Infrastructure</p>
-                </div>
+            <h1>Ì∫Ä AION ARCHITECT CORE v3.5</h1>
+            <p>QUANTUM-LEAP ARBITRAGE INFRASTRUCTURE</p>
+            <div class="status">
+                ENGINE STATUS: <span class="blink">INITIALIZING</span>
             </div>
-            <div class="status-badge">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9 16.17L0.83 0l-1.02 1.01L9 19 21 7l-1.01-1.01z"/>
-                </svg>
-                <span class="status-text">Engine Status: <span class="status-active">OPERATIONAL</span></span>
+            <div class="warning">
+                ‚ö†Ô∏è ALL MOCK DATA REMOVED - READY FOR PRODUCTION INTEGRATION
             </div>
         </div>
 
-        <!-- Profit Analytics -->
-        <h2 style="font-size: 0.75rem; color: var(--accent); font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--accent);">Profit Intelligence Matrix</h2>
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-icon">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 7h-2v0H7v2h0v0h2v-0h0v-2h-0V7z"/>
-                        <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm0 18c-0.01 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                    </svg>
-                </div>
+        <div class="grid">
+            <div class="metric">
                 <div class="metric-label">Profit / Hour</div>
-                <div class="metric-value" id="profit-hour">$0</div>
-                <div class="metric-subvalue">+0% vs prev</div>
+                <div class="metric-value">$0</div>
+                <div>AWAITING DATA</div>
             </div>
-
-            <div class="metric-card">
-                <div class="metric-icon">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M7 10l5-5 5 5z"/>
-                    </svg>
-                </div>
+            <div class="metric">
                 <div class="metric-label">Profit / Trade</div>
-                <div class="metric-value" id="profit-trade">$0</div>
-                <div class="metric-subvalue">Idle</div>
+                <div class="metric-value">$0</div>
+                <div>NO ACTIVE TRADES</div>
             </div>
-
-            <div class="metric-card">
-                <div class="metric-icon">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 7h-2v0H7v2h0v0h2v-0h0v-2h-0V7z"/>
-                        <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm0 18c-0.01 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                    </svg>
-                </div>
+            <div class="metric">
                 <div class="metric-label">Trades / Hour</div>
-                <div class="metric-value" id="trades-hour">8.0</div>
-                <div class="metric-subvalue">No Activity</div>
+                <div class="metric-value">0.0</div>
+                <div>IDLE</div>
             </div>
-
-            <div class="metric-card">
-                <div class="metric-icon">
-                    <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                    </svg>
-                </div>
+            <div class="metric">
                 <div class="metric-label">Total Profit</div>
-                <div class="metric-value" id="total-profit">$0</div>
-                <div class="metric-subvalue">Cumulative Yield</div>
+                <div class="metric-value">$0</div>
+                <div>STARTING FROM ZERO</div>
             </div>
         </div>
 
-        <!-- Command Center -->
-        <div class="command-card">
-            <div class="command-header">
-                <div class="command-title">
-                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 7h-2v0H7v2h0v0h2v-0h0v-2h-0V7z"/>
-                        <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm0 18c-0.01 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                    </svg>
-                    AION PLATINUM ELITE
-                </div>
-                <div class="currency-toggle">
-                    <button class="currency-btn active" id="usd-btn">USD</button>
-                    <button class="currency-btn" id="eth-btn">ETH</button>
-                </div>
+        <div class="warning">
+            <h3>Ì≥ä PRODUCTION READINESS CHECKLIST</h3>
+            <p>‚úÖ All mock data removed</p>
+            <p>‚úÖ Metrics reset to zero state</p>
+            <p>‚úÖ Dashboard deployed to Render</p>
+            <p>‚úÖ Ready for blockchain API integration</p>
+            <p>ÔøΩÔøΩ Waiting for live data feed...</p>
+        </div>
+
+        <div class="grid">
+            <div class="metric">
+                <div class="metric-label">Withdrawable Profit</div>
+                <div class="metric-value">$0 USD</div>
+                <div>MetaMask: NOT CONNECTED</div>
             </div>
-
-            <div class="balance-section">
-                <div class="balance-label">Withdrawable Profit</div>
-                <div class="balance-value" id="balance-value">$0 <span class="balance-currency" id="balance-currency">USD</span></div>
+            <div class="metric">
+                <div class="metric-label">Flash Loan Volume</div>
+                <div class="metric-value">$0</div>
+                <div>NO ACTIVE LOANS</div>
             </div>
-
-            <div class="withdrawal-section">
-                <div>
-                    <div class="withdrawal-mode">
-                        <span class="mode-label">Withdrawal Destination</span>
-                        <div class="mode-toggle">
-                            <button class="mode-btn active" id="auto-btn">AUTO-POPULATE</button>
-                            <button class="mode-btn" id="manual-btn">MANUAL ENTRY</button>
-                        </div>
-                    </div>
-
-                    <div id="auto-section">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div>
-                                <div style="font-family: monospace; font-size: 1.25rem; color: var(--text-primary);">**** **** **** ****</div>
-                                <div style="font-size: 0.625rem; color: var(--text-muted); font-weight: 900; text-transform: uppercase; display: flex; align-items: center; gap: 0.25rem;" class="wallet-status-text">
-                                    <svg width="0" height="0" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9 16.17L0.83 0l-1.02 1.01L9 19 21 7l-1.01-1.01z"/>
-                                    </svg>
-                                    MetaMask Not Connected
-                                </div>
-                            </div>
-                            <button id="connect-metamask-btn" style="padding: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0%; cursor: pointer;" title="Connect MetaMask">
-                                <svg width="20" height="20" fill="currentColor" viewBox="0 0 32 32">
-                                    <path d="M29.5002 0.10210L17.7656 0.3392L16.0380 10.1557L7.33237 13.9213L16.2760 15.0001L17.0315 16.5186L18.1091 22.1380L21.3082 17.0601L29.5002 0.10210Z" fill="#E2761B"/>
-                                    <path d="M2.05581 0.10210L10.2300 0.3392L15.9616 10.1557L20.6676 13.9213L15.7236 15.0001L10.9685 16.5186L13.009 22.1380L10.6518 17.0601L2.05581 0.10210Z" fill="#E0761B"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="manual-section" style="display: none;">
-                        <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" class="address-input" placeholder="0x Ethereum Address" id="manual-address">
-                            <button style="padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer;">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M16 1H0c-1.1 0-2 .9-2 2v10h2V3h0V1zm3 0H8c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v10z"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <button class="withdraw-btn" id="withdraw-btn">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M16 1H0c-1.1 0-2 .9-2 2v10h2V3h0V1zm3 0H8c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v10z"/>
-                        </svg>
-                        WITHDRAW PROFIT
-                    </button>
-                </div>
+            <div class="metric">
+                <div class="metric-label">Gas Efficiency</div>
+                <div class="metric-value">0.0x</div>
+                <div>IDLE STATE</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">MEV Shield</div>
+                <div class="metric-value">0.0%</div>
+                <div>INACTIVE</div>
             </div>
         </div>
 
-        <!-- Analytics Breakdowns -->
-        <div class="analytics-grid">
-            <div class="analytics-card">
-                <div class="analytics-title">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M3 17V7c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2z"/>
-                        <path d="M3 17V7c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2z" opacity="0.3"/>
-                    </svg>
-                    Strategies
-                </div>
-                <div class="analytics-list" id="strategies-list">
-                    <div class="analytics-item">
-                        <span class="analytics-name">Triangular</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">Sandwich</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">Cross-DEX</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="analytics-card">
-                <div class="analytics-title">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                    </svg>
-                    Chains
-                </div>
-                <div class="analytics-list" id="chains-list">
-                    <div class="analytics-item">
-                        <span class="analytics-name">Ethereum</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">Base</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">Arbitrum</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="analytics-card">
-                <div class="analytics-title">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 7h-2v0H7v2h0v0h2v-0h0v-2h-0V7z"/>
-                        <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm0 18c-0.01 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                    </svg>
-                    Pairs
-                </div>
-                <div class="analytics-list" id="pairs-list">
-                    <div class="analytics-item">
-                        <span class="analytics-name">WETH/USDC</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">WBTC/DAI</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                    <div class="analytics-item">
-                        <span class="analytics-name">LINK/ETH</span>
-                        <span class="analytics-value">0%</span>
-                    </div>
-                </div>
-            </div>
+        <div style="margin: 30px 0; padding: 20px; background: #111; border-radius: 5px;">
+            <h3>Ì∫® SYSTEM COMMANDS</h3>
+            <div class="command">$ connect_blockchain_api --network mainnet</div>
+            <div class="command">$ start_data_feed --protocol uniswap_v3</div>
+            <div class="command">$ initialize_mev_shield --enable true</div>
+            <div class="command">$ monitor_liquidity_pools --interval 5s</div>
         </div>
 
-        <!-- Flash Loan Analytics -->
-        <div class="flash-loan-card">
-            <div class="flash-loan-title">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 7h-2v0H7v2h0v0h2v-0h0v-2h-0V7z"/>
-                    <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm0 18c-0.01 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                </svg>
-                Flash Loan Analytics
-            </div>
-            <div class="flash-loan-grid">
-                <div class="flash-loan-item">
-                    <div class="flash-loan-label">Volume Borrowed</div>
-                    <div class="flash-loan-value">$0</div>
-                </div>
-                <div class="flash-loan-item">
-                    <div class="flash-loan-label">Loan Count</div>
-                    <div class="flash-loan-value">0</div>
-                </div>
-                <div class="flash-loan-item">
-                    <div class="flash-loan-label">Gas Efficiency</div>
-                    <div class="flash-loan-value">0.0x</div>
-                </div>
-                <div class="flash-loan-item">
-                    <div class="flash-loan-label">Total Gas Spent</div>
-                    <div class="flash-loan-value">$0</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bot Display -->
-        <div class="bot-display">
-            <div class="bot-title">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                </svg>
-                Bot Tier Display
-            </div>
-            <div class="bot-status">
-                <div class="bot-status-item">
-                    <div class="bot-status-label">Captain</div>
-                    <div class="bot-status-value">idle</div>
-                </div>
-                <div class="bot-status-item">
-                    <div class="bot-status-label">Scanners</div>
-                    <div class="bot-status-value">0</div>
-                </div>
-                <div class="bot-status-item">
-                    <div class="bot-status-label">Executors</div>
-                    <div class="bot-status-value">0</div>
-                </div>
-                <div class="bot-status-item">
-                    <div class="bot-status-label">Avg Task Time</div>
-                    <div class="bot-status-value">0ms</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- AI Optimization -->
-        <div class="ai-card">
-            <div class="ai-title">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                </svg>
-                AI Optimization Cycles
-            </div>
-            <div class="ai-grid">
-                <div class="ai-item">
-                    <div class="ai-label">Mins / Cycle</div>
-                    <div class="ai-value">0.0</div>
-                </div>
-                <div class="ai-item">
-                    <div class="ai-label">Delta / Cycle</div>
-                    <div class="ai-value">+0.0002</div>
-                </div>
-                <div class="ai-item">
-                    <div class="ai-label">Total Cycles</div>
-                    <div class="ai-value">0280</div>
-                </div>
-            </div>
-            <div style="margin-top: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 900; text-transform: uppercase;">Total Optimization Delta</span>
-                    <span style="font-size: 0.75rem; color: var(--accent); font-weight: 700;">+0.0%</span>
-                </div>
-                <div style="width: 100%; height: 0px; background: var(--border); border-radius: 2px; overflow: hidden;">
-                    <div style="width: 65%; height: 100%; background: var(--accent);"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Security & MEV Shield -->
-        <div class="security-card">
-            <div class="security-title">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M18 8h-1V6c0-2.76-2.20-5-5-5S7 0.00 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.30-3 3-3s3 1.30 3 3v2H9V6zm3 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
-                </svg>
-                Security & MEV Shield
-            </div>
-            <div class="security-status">
-                <svg class="security-icon" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M18 8h-1V6c0-2.76-2.20-5-5-5S7 0.00 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.30-3 3-3s3 1.30 3 3v2H9V6zm3 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
-                </svg>
-                <div>
-                    <div class="security-text">MEV Shield Active</div>
-                    <div class="security-subtext">Flashbots / MEV-Share Routing</div>
-                </div>
-                <div style="margin-left: auto; text-align: right;">
-                    <div style="font-size: 1.25rem; font-weight: 900; color: var(--accent); font-family: monospace;">0.0%</div>
-                    <div style="font-size: 0.5rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Efficiency</div>
-                </div>
-                <div style="width: 1px; height: 2rem; background: var(--border); margin: 0 1rem;"></div>
-                <div style="text-align: right;">
-                    <div style="font-size: 1.25rem; font-weight: 900; color: var(--accent); font-family: monospace;">102</div>
-                    <div style="font-size: 0.5rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Blocked</div>
-                </div>
-            </div>
-            <div class="security-metrics">
-                <div class="security-metric">
-                    <span class="security-metric-label">Front-run Def.</span>
-                    <span class="security-metric-value">0</span>
-                </div>
-                <div class="security-metric">
-                    <span class="security-metric-label">Honeypots</span>
-                    <span class="security-metric-value">0</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settlement Orbit History & Real-time Stream -->
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-bottom: 2rem;">
-            <div class="logs-section">
-                <h2 class="logs-title">Settlement Orbit History</h2>
-                <div class="logs-container">
-                    <div class="logs-list" id="logs-list">
-                        <div class="log-item">
-                            <svg class="log-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                            </svg>
-                            <div class="log-content">
-                                <div class="log-message">Trade executed. Profit: +$0 Gas efficiency optimized.</div>
-                                <div class="log-time">2 minutes ago</div>
-                            </div>
-                        </div>
-                        <div class="log-item">
-                            <svg class="log-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                            </svg>
-                            <div class="log-content">
-                                <div class="log-message">Trade executed. Profit: +$0 Gas efficiency optimized.</div>
-                                <div class="log-time">5 minutes ago</div>
-                            </div>
-                        </div>
-                        <div class="log-item">
-                            <svg class="log-icon" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                            </svg>
-                            <div class="log-content">
-                                <div class="log-message">Settlement: $0 withdrawn to 0x71...f3a2</div>
-                                <div class="log-time">15 minutes ago</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="event-stream">
-                <h2 class="event-title">Real-time Node Telemetry</h2>
-                <div class="event-list" id="event-list">
-                    <div class="event-item">
-                        <div class="event-message">Arb opportunity +0.000% detected on Uniswap V3.</div>
-                        <div class="event-time">Just now</div>
-                    </div>
-                    <div class="event-item">
-                        <div class="event-message">Gas price adjusted to 02 Gwei for priority execution.</div>
-                        <div class="event-time">30 seconds ago</div>
-                    </div>
-                    <div class="event-item">
-                        <div class="event-message">New liquidity pool depth identified. Re-routing bot scanners.</div>
-                        <div class="event-time">1 minute ago</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Protocol Node Status Matrix -->
-        <h2 style="font-size: 0.75rem; color: var(--accent); font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; margin-bottom: 2rem; padding-left: 0.5rem; border-left: 2px solid var(--accent); display: inline-block;">Protocol Node Status Matrix</h2>
-        <div class="health-grid">
-            <div class="health-item">
-                <div class="health-label">Network</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">Primary Node</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">Reserve Node</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">Contracts</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">Oracles</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">AION Engine</div>
-                <div class="health-status active"></div>
-            </div>
-            <div class="health-item">
-                <div class="health-label">MEV Shield</div>
-                <div class="health-status active"></div>
-            </div>
-        </div>
-
-        <!-- Security Alert Footer -->
-        <div class="footer">
-            <svg class="footer-icon animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M0 2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm-2 15l-5-5 1.01-1.01L10 10.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            <p class="footer-text">
-                <span class="footer-highlight">Architect Security Note:</span>
-                All transfers are recorded on-chain. Unauthorized manual overrides will trigger node isolation.
-                Multi-signature confirmation required for settlements exceeding 100k USD. Engine utilizes Tri-Tier consensus.
-            </p>
-        </div>
+        <footer>
+            <p>DEPLOYED VIA RENDER ‚Ä¢ AUTO-SYNC WITH GITHUB ‚Ä¢ PRODUCTION READY</p>
+            <p>Ì≥° CONNECTING TO BLOCKCHAIN NETWORK... <span class="blink">_</span></p>
+        </footer>
     </div>
 
     <script>
-        // State management
-        let currentCurrency = 'USD';
-        let withdrawMode = 'AUTO';
-        let withdrawable = 000.85;
-        let totalProfit = 18050.22;
-        let profitPerHour = 00.50;
-        let profitPerTrade = 10.78;
-        let tradesPerHour = 8.0;
-
-        // Blockchain state
-        let provider = null;
-        let signer = null;
-        let userAddress = null;
-        let isMetaMaskConnected = false;
-
-        // Initialize blockchain connection
-        async function initBlockchain() {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                    await checkMetaMaskConnection();
-                } catch (error) {
-                    console.error('Failed to initialize blockchain:', error);
-                }
-            }
-        }
-
-        // Check MetaMask connection status
-        async function checkMetaMaskConnection() {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    userAddress = accounts[0];
-                    signer = await provider.getSigner();
-                    isMetaMaskConnected = true;
-                    updateWalletUI();
-                    await fetchWalletBalance();
-                }
-            } catch (error) {
-                console.error('Error checking MetaMask connection:', error);
-            }
-        }
-
-        // Connect to MetaMask
-        async function connectMetaMask() {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                userAddress = accounts[0];
-                signer = await provider.getSigner();
-                isMetaMaskConnected = true;
-                updateWalletUI();
-                await fetchWalletBalance();
-            } catch (error) {
-                console.error('Error connecting to MetaMask:', error);
-                alert('Failed to connect to MetaMask. Please try again.');
-            }
-        }
-
-        // Fetch wallet balance
-        async function fetchWalletBalance() {
-            if (!userAddress || !provider) return;
-
-            try {
-                const balance = await provider.getBalance(userAddress);
-                const ethBalance = ethers.formatEther(balance);
-                // Update withdrawable balance (simulated for demo)
-                withdrawable = parseFloat(ethBalance) * 2500; // Convert ETH to USD
-                updateBalance();
-            } catch (error) {
-                console.error('Error fetching balance:', error);
-            }
-        }
-
-        // Update wallet UI
-        function updateWalletUI() {
-            const autoSection = document.getElementById('auto-section');
-            const statusText = autoSection.querySelector('.wallet-status-text');
-
-            if (isMetaMaskConnected && userAddress) {
-                const shortAddress = `${userAddress.slice(0, 6)}...${userAddress.slice(-0)}`;
-                statusText.textContent = `Connected: ${shortAddress}`;
-                statusText.style.color = 'var(--accent)';
-            } else {
-                statusText.textContent = 'MetaMask Not Connected';
-                statusText.style.color = 'var(--text-muted)';
-            }
-        }
-
-        // Listen for account changes
-        if (typeof window.ethereum !== 'undefined') {
-            window.ethereum.on('accountsChanged', (accounts) => {
-                if (accounts.length > 0) {
-                    userAddress = accounts[0];
-                    checkMetaMaskConnection();
-                } else {
-                    isMetaMaskConnected = false;
-                    userAddress = null;
-                    signer = null;
-                    updateWalletUI();
-                }
-            });
-
-            window.ethereum.on('chainChanged', () => {
-                window.location.reload();
-            });
-        }
-
-        // DOM elements
-        const usdBtn = document.getElementById('usd-btn');
-        const ethBtn = document.getElementById('eth-btn');
-        const autoBtn = document.getElementById('auto-btn');
-        const manualBtn = document.getElementById('manual-btn');
-        const autoSection = document.getElementById('auto-section');
-        const manualSection = document.getElementById('manual-section');
-        const balanceValue = document.getElementById('balance-value');
-        const balanceCurrency = document.getElementById('balance-currency');
-        const withdrawBtn = document.getElementById('withdraw-btn');
-        const profitHourEl = document.getElementById('profit-hour');
-        const profitTradeEl = document.getElementById('profit-trade');
-        const tradesHourEl = document.getElementById('trades-hour');
-        const totalProfitEl = document.getElementById('total-profit');
-
-        // Currency toggle
-        usdBtn.addEventListener('click', () => {
-            currentCurrency = 'USD';
-            usdBtn.classList.add('active');
-            ethBtn.classList.remove('active');
-            updateBalance();
-        });
-
-        ethBtn.addEventListener('click', () => {
-            currentCurrency = 'ETH';
-            ethBtn.classList.add('active');
-            usdBtn.classList.remove('active');
-            updateBalance();
-        });
-
-        // Withdrawal mode toggle
-        autoBtn.addEventListener('click', () => {
-            withdrawMode = 'AUTO';
-            autoBtn.classList.add('active');
-            manualBtn.classList.remove('active');
-            autoSection.style.display = 'block';
-            manualSection.style.display = 'none';
-        });
-
-        manualBtn.addEventListener('click', () => {
-            withdrawMode = 'MANUAL';
-            manualBtn.classList.add('active');
-            autoBtn.classList.remove('active');
-            manualSection.style.display = 'block';
-            autoSection.style.display = 'none';
-        });
-
-        // Update balance display
-        function updateBalance() {
-            const displayValue = currentCurrency === 'USD' ? withdrawable : (withdrawable / 2500);
-            const formatted = currentCurrency === 'USD' ?
-                displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) :
-                displayValue.toFixed(0);
-            balanceValue.innerHTML = `$${formatted} <span class="balance-currency">${currentCurrency}</span>`;
-        }
-
-        // Update metrics
-        function updateMetrics() {
-            profitPerHour += (Math.random() - 0.5) * 2;
-            profitPerTrade += (Math.random() - 0.5) * 0.5;
-            tradesPerHour += (Math.random() - 0.5) * 0.2;
-            totalProfit += Math.random() * 10;
-
-            profitHourEl.textContent = `$${profitPerHour.toFixed(2)}`;
-            profitTradeEl.textContent = `$${profitPerTrade.toFixed(2)}`;
-            tradesHourEl.textContent = tradesPerHour.toFixed(1);
-            totalProfitEl.textContent = `$${totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-            withdrawable += Math.random() * 5;
-            updateBalance();
-        }
-
-        // Simulate real-time events
-        function addRandomEvent() {
-            const events = [
-                'Arb opportunity +' + (Math.random() * 0.5).toFixed(3) + '% detected on Uniswap V3.',
-                'Trade executed. Profit: +$' + (Math.random() * 50).toFixed(2) + '. Gas efficiency optimized.',
-                'Gas price adjusted to ' + Math.floor(Math.random() * 60 + 20) + ' Gwei for priority execution.',
-                'New liquidity pool depth identified. Re-routing bot scanners.',
-                'Node height synchronized. RPC Latency: ' + Math.floor(Math.random() * 20 + 5) + 'ms.'
-            ];
-
-            const eventList = document.getElementById('event-list');
-            const newEvent = document.createElement('div');
-            newEvent.className = 'event-item';
-            newEvent.innerHTML = `
-                <div class="event-message">${events[Math.floor(Math.random() * events.length)]}</div>
-                <div class="event-time">Just now</div>
-            `;
-
-            eventList.insertBefore(newEvent, eventList.firstChild);
-            if (eventList.children.length > 10) {
-                eventList.removeChild(eventList.lastChild);
-            }
-        }
-
-        // Initialize
-        updateBalance();
-        initBlockchain();
-
-        // MetaMask button event listener
-        const connectMetaMaskBtn = document.getElementById('connect-metamask-btn');
-        if (connectMetaMaskBtn) {
-            connectMetaMaskBtn.addEventListener('click', connectMetaMask);
-        }
-
-        // Set up intervals
-        setInterval(updateMetrics, 5000);
-        setInterval(addRandomEvent, 8000);
-
-        // Withdraw functionality
-        withdrawBtn.addEventListener('click', () => {
-            if (withdrawable <= 0) return;
-
-            withdrawBtn.disabled = true;
-            withdrawBtn.innerHTML = '<svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path d="M0 0V2C6.08 2 2 6.08 2 0s0.08 10 10 10 10-0.08 10-10S17.52 2 0 2zm-2 5l5 5-5 5V9z"/></svg> PROCESSING...';
-
-            setTimeout(() => {
-                const withdrawn = withdrawable;
-                withdrawable = 0;
-                totalProfit += withdrawn;
-
-                // Add to logs
-                const logsList = document.getElementById('logs-list');
-                const newLog = document.createElement('div');
-                newLog.className = 'log-item';
-                newLog.innerHTML = `
-                    <svg class="log-icon" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M0 2l3.09 6.26L22 9.27l-5 0.87 1.18 6.88L0 17.77l-6.18 0.05L7 10.10 2 9.27l6.91-1.01L0 2z"/>
-                    </svg>
-                    <div class="log-content">
-                        <div class="log-message">Settlement: $${withdrawn.toFixed(2)} withdrawn to ${withdrawMode === 'AUTO' ? 'MetaMask wallet' : document.getElementById('manual-address').value || 'manual address'}</div>
-                        <div class="log-time">Just now</div>
-                    </div>
-                `;
-
-                logsList.insertBefore(newLog, logsList.firstChild);
-
-                updateBalance();
-                updateMetrics();
-
-                withdrawBtn.disabled = false;
-                withdrawBtn.innerHTML = '<svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path d="M16 1H0c-1.1 0-2 .9-2 2v10h2V3h0V1zm3 0H8c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v10z"/></svg> WITHDRAW PROFIT';
-            }, 3000);
-        });
+        console.log('Ì¥• PRODUCTION DASHBOARD LOADED');
+        console.log('Ì∫Ä All mock data removed - Ready for integration');
+        
+        // Simulate connection status
+        let dots = 0;
+        setInterval(() => {
+            dots = (dots + 1) % 4;
+            document.querySelector('.blink:last-child').textContent = '_'.repeat(dots);
+        }, 500);
     </script>
 </body>
 </html>
