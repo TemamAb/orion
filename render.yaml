@@ -1,10 +1,9 @@
-services:
-  - type: web
-    name: aion-production
-    env: static
-    buildCommand: ""
-    staticPublishPath: ./public
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+static:
+  name: aion-production-dashboard
+  env: static
+  buildCommand: ""
+  staticPublishPath: ./public
+  routes:
+    - type: rewrite
+      source: /*
+      destination: /index.html
