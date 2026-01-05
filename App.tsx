@@ -89,6 +89,8 @@ const App: React.FC = () => {
    const [activeView, setActiveView] = useState<'LIVE' | 'MASTER' | 'FOLLOW' | 'MONITOR' | 'WITHDRAW' | 'INTEL' | 'PERFORMANCE'>('MASTER');
    const [sidebarExpanded, setSidebarExpanded] = useState(false);
    const [engineStarted, setEngineStarted] = useState(false);
+   const [deploymentContractNumber, setDeploymentContractNumber] = useState('');
+   const [generatedSmartAccount, setGeneratedSmartAccount] = useState('');
 
    // Dynamic Currency Logic
    const [viewCurrency, setViewCurrency] = useState<'USD' | 'ETH'>('USD');
@@ -96,7 +98,9 @@ const App: React.FC = () => {
 
    const [auditedStats, setAuditedStats] = useState<any>(null);
    const [isAuditing, setIsAuditing] = useState(false);
-   const totalUsdYield = auditedStats?.totalProfit || 0;
+   const totalProfit = auditedStats?.totalProfit || 0;
+   const [profitTarget, setProfitTarget] = useState(1000000); // $1M default target
+   const profitAchievement = totalProfit > 0 ? Math.min((totalProfit / profitTarget) * 100, 100) : 0;
 
    // Format Helper
    const formatCurrency = (valUsd: number) => {
@@ -110,7 +114,10 @@ const App: React.FC = () => {
    const [targetWallet, setTargetWallet] = useState('');
    const [detectingWallet, setDetectingWallet] = useState(false);
    const [isWalletDetected, setIsWalletDetected] = useState(false);
+   const [isAddressValid, setIsAddressValid] = useState(false);
    const [executingWithdrawal, setExecutingWithdrawal] = useState(false);
+   const [withdrawalMode, setWithdrawalMode] = useState<'AUTO' | 'MANUAL'>('MANUAL');
+   const [autoWithdrawThreshold, setAutoWithdrawThreshold] = useState(10000); // $10k default
 
    // Performance Fluctuations
    const [performanceStats, setPerformanceStats] = useState(APEX_STRATEGY_NODES.map(() => 0));
@@ -176,19 +183,32 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
    }, [engineStarted, connectionStatus, BACKEND_URL]);
 
+   // Address Validation Helper
+   const validateAddress = (address: string) => {
+      try {
+         if (!address) return false;
+         return ethers.isAddress(address);
+      } catch {
+         return false;
+      }
+   };
+
    // MetaMask Detection
    const detectWalletAddress = async () => {
       if (detectingWallet) return;
       setDetectingWallet(true);
       setIsWalletDetected(false);
+      setIsAddressValid(false);
 
       try {
          await new Promise(resolve => setTimeout(resolve, 1000));
          if (typeof (window as any).ethereum !== 'undefined') {
             const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
             if (accounts && accounts.length > 0) {
-               setTargetWallet(accounts[0]);
+               const address = accounts[0];
+               setTargetWallet(address);
                setIsWalletDetected(true);
+               setIsAddressValid(validateAddress(address));
             }
          } else {
             alert("Wallet extension (MetaMask) not found.");
@@ -200,12 +220,18 @@ const App: React.FC = () => {
       }
    };
 
+   // Manual Address Input Handler
+   const handleAddressInput = (address: string) => {
+      setTargetWallet(address);
+      setIsAddressValid(validateAddress(address));
+   };
+
    const handleWithdrawalExecution = async () => {
       if (!targetWallet) return alert("Please enter a withdrawal address.");
       setExecutingWithdrawal(true);
       await new Promise(resolve => setTimeout(resolve, 3000));
       setExecutingWithdrawal(false);
-      alert(`Withdrawal Successful: ${formatCurrency(totalUsdYield)} sent to ${targetWallet}`);
+      alert(`Withdrawal Successful: ${formatCurrency(totalProfit)} sent to ${targetWallet}`);
    };
 
    useEffect(() => {
@@ -314,7 +340,17 @@ const App: React.FC = () => {
             const sRes = await fetch(`${BACKEND_URL}/api/status`);
             const sData = await sRes.json();
             setServerStatus(sData);
-            console.log(`[Orion Architecture] Smart Account Forged: ${sData.blockchain?.accountAddress}`);
+
+            // Generate deployment contract number
+            const deploymentId = `ORION-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+            setDeploymentContractNumber(deploymentId);
+
+            // Capture smart account address
+            if (sData.blockchain?.accountAddress) {
+               setGeneratedSmartAccount(sData.blockchain.accountAddress);
+               console.log(`[Orion Architecture] Smart Account Forged: ${sData.blockchain.accountAddress}`);
+               console.log(`[Orion Deployment] Contract Number: ${deploymentId}`);
+            }
             return true;
          }
          return false;
@@ -460,17 +496,45 @@ const App: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                            <div className="lg:col-span-5 flex justify-center py-10 relative">
                               <div className="relative flex items-center justify-center">
-                                 <svg width="250" height="250" viewBox="0 0 250 250" className={`transform -rotate-90 transition-all duration-1000 ${engineStarted ? 'scale-110 drop-shadow-[0_0_30px_rgba(251,191,36,0.1)]' : 'opacity-40'}`}>
+                                 <svg width="280" height="280" viewBox="0 0 280 280" className={`transform -rotate-90 transition-all duration-1000 ${engineStarted ? 'scale-110 drop-shadow-[0_0_30px_rgba(251,191,36,0.1)]' : 'opacity-40'}`}>
+                                    {/* Profit Achievement Progress Ring (Outer) */}
+                                    {engineStarted && (
+                                       <>
+                                          {/* Background ring */}
+                                          <circle
+                                             cx="140"
+                                             cy="140"
+                                             r="130"
+                                             fill="transparent"
+                                             stroke="#1e293b"
+                                             strokeWidth="8"
+                                          />
+                                          {/* Progress ring */}
+                                          <circle
+                                             cx="140"
+                                             cy="140"
+                                             r="130"
+                                             fill="transparent"
+                                             stroke="#10b981"
+                                             strokeWidth="8"
+                                             strokeDasharray={`${(profitAchievement / 100) * (2 * Math.PI * 130)} ${2 * Math.PI * 130}`}
+                                             className="transition-all duration-1000"
+                                             style={{ filter: 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.5))' }}
+                                          />
+                                       </>
+                                    )}
+
+                                    {/* Strategy Distribution Rings (Inner) */}
                                     {APEX_STRATEGY_NODES.map((item, idx) => {
-                                       const circumference = 2 * Math.PI * 110;
+                                       const circumference = 2 * Math.PI * 105;
                                        const dash = (item.contribution / 100) * circumference;
                                        const offset = -APEX_STRATEGY_NODES.slice(0, idx).reduce((acc, curr) => acc + (curr.contribution / 100) * circumference, 0);
                                        return (
                                           <circle
                                              key={idx}
-                                             cx="125"
-                                             cy="125"
-                                             r="110"
+                                             cx="140"
+                                             cy="140"
+                                             r="105"
                                              fill="transparent"
                                              stroke={STRATEGY_COLORS[idx % STRATEGY_COLORS.length]}
                                              strokeWidth="25"
@@ -482,13 +546,18 @@ const App: React.FC = () => {
                                     })}
                                  </svg>
                                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Target Yield</span>
+                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total Profit</span>
                                     <span className="text-3xl font-black text-[#fbbf24] font-mono tracking-tighter leading-none">
-                                       {engineStarted ? formatCurrency(totalUsdYield) : '---'}
+                                       {engineStarted ? formatCurrency(totalProfit) : '---'}
                                     </span>
-                                    <span className={`text-[7px] font-bold uppercase mt-2 ${engineStarted ? 'text-green-400' : 'text-slate-600'}`}>
-                                       {engineStarted ? 'Active Cluster' : 'LOCKED'}
+                                    <span className={`text-[7px] font-bold uppercase mt-1 ${engineStarted ? 'text-green-400' : 'text-slate-600'}`}>
+                                       {engineStarted ? `${profitAchievement.toFixed(1)}% of Target` : 'LOCKED'}
                                     </span>
+                                    {engineStarted && (
+                                       <span className="text-[6px] font-black text-slate-600 uppercase tracking-widest mt-0.5">
+                                          Target: {formatCurrency(profitTarget)}
+                                       </span>
+                                    )}
                                  </div>
                               </div>
                            </div>
@@ -724,7 +793,7 @@ const App: React.FC = () => {
                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Profit Balance</span>
                                  <div className="flex items-baseline gap-4">
                                     <span className="text-6xl font-mono font-black text-white tracking-tighter">
-                                       {engineStarted ? formatCurrency(totalUsdYield) : 'LOCKED'}
+                                       {engineStarted ? formatCurrency(totalProfit) : 'LOCKED'}
                                     </span>
                                     {engineStarted && (
                                        <div className="flex flex-col gap-2">
@@ -743,6 +812,62 @@ const App: React.FC = () => {
                         </div>
 
                         <div className="bg-black/60 border border-white/10 rounded-[2.5rem] p-10 backdrop-blur-xl shadow-xl flex flex-col gap-10 text-left">
+                           {/* Withdrawal Mode Selection */}
+                           <div className="flex items-center justify-between border-b border-white/5 pb-6">
+                              <div className="flex items-center gap-4">
+                                 <div className="p-3 bg-[#fbbf24]/10 rounded-2xl border border-[#fbbf24]/20">
+                                    <Settings size={22} className="text-[#fbbf24]" />
+                                 </div>
+                                 <div>
+                                    <h3 className="text-sm font-black text-white uppercase tracking-widest mb-1">Withdrawal Mode</h3>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Configure transfer automation</p>
+                                 </div>
+                              </div>
+                              <div className="flex gap-3">
+                                 <button
+                                    onClick={() => setWithdrawalMode('MANUAL')}
+                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${withdrawalMode === 'MANUAL'
+                                          ? 'bg-[#fbbf24] text-black'
+                                          : 'bg-white/5 text-slate-600 hover:bg-white/10'
+                                       }`}
+                                 >
+                                    Manual
+                                 </button>
+                                 <button
+                                    onClick={() => setWithdrawalMode('AUTO')}
+                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${withdrawalMode === 'AUTO'
+                                          ? 'bg-[#10b981] text-black'
+                                          : 'bg-white/5 text-slate-600 hover:bg-white/10'
+                                       }`}
+                                 >
+                                    Auto
+                                 </button>
+                              </div>
+                           </div>
+
+                           {/* Auto Mode Threshold */}
+                           {withdrawalMode === 'AUTO' && (
+                              <div className="p-6 rounded-2xl bg-[#10b981]/5 border border-[#10b981]/20 flex flex-col gap-4">
+                                 <div className="flex items-center gap-2">
+                                    <Zap size={14} className="text-[#10b981]" />
+                                    <span className="text-[10px] font-black text-[#10b981] uppercase tracking-widest">Auto-Transfer Threshold</span>
+                                 </div>
+                                 <div className="flex items-center gap-4">
+                                    <input
+                                       type="number"
+                                       value={autoWithdrawThreshold}
+                                       onChange={(e) => setAutoWithdrawThreshold(Number(e.target.value))}
+                                       className="flex-1 bg-black/40 border border-[#10b981]/20 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-[#10b981]/40"
+                                    />
+                                    <span className="text-[10px] font-black text-slate-500 uppercase">USD</span>
+                                 </div>
+                                 <p className="text-[8px] text-slate-600 uppercase font-bold tracking-wider">
+                                    Profits will automatically transfer when balance exceeds {formatCurrency(autoWithdrawThreshold)}
+                                 </p>
+                              </div>
+                           )}
+
+                           {/* Recipient Wallet */}
                            <div className="flex items-center justify-between border-b border-white/5 pb-6">
                               <div className="flex items-center gap-4">
                                  <div className="p-3 bg-[#fbbf24]/10 rounded-2xl border border-[#fbbf24]/20">
@@ -753,7 +878,7 @@ const App: React.FC = () => {
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Designate your secure settlement endpoint</p>
                                  </div>
                               </div>
-                              {isWalletDetected && (
+                              {isWalletDetected && isAddressValid && (
                                  <span className="text-[8px] font-black text-green-500 uppercase tracking-widest px-3 py-1 border border-green-500/30 rounded-lg bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.1)]">Secure Link Active</span>
                               )}
                            </div>
@@ -769,13 +894,27 @@ const App: React.FC = () => {
                                  <input
                                     type="text"
                                     value={targetWallet}
-                                    onChange={(e) => setTargetWallet(e.target.value)}
+                                    onChange={(e) => handleAddressInput(e.target.value)}
                                     placeholder="Enter Withdrawal Address (0x...)"
-                                    className="w-full bg-black/40 border border-white/5 rounded-[1.5rem] py-6 px-8 text-sm font-mono text-[#fbbf24] focus:outline-none focus:border-[#fbbf24]/40 transition-all placeholder:text-slate-800"
+                                    className={`w-full bg-black/40 border rounded-[1.5rem] py-6 px-8 text-sm font-mono text-[#fbbf24] focus:outline-none transition-all placeholder:text-slate-800 ${targetWallet && isAddressValid
+                                          ? 'border-green-500/40 focus:border-green-500/60'
+                                          : targetWallet && !isAddressValid
+                                             ? 'border-red-500/40 focus:border-red-500/60'
+                                             : 'border-white/5 focus:border-[#fbbf24]/40'
+                                       }`}
                                  />
-                                 <div className="absolute right-6 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-white/5 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <VerifiedIcon size={16} className="text-slate-600" />
-                                 </div>
+                                 {targetWallet && (
+                                    <div className={`absolute right-6 top-1/2 -translate-y-1/2 p-2 rounded-xl border transition-all ${isAddressValid
+                                          ? 'bg-green-500/10 border-green-500/30'
+                                          : 'bg-red-500/10 border-red-500/30'
+                                       }`}>
+                                       {isAddressValid ? (
+                                          <CheckCircle2 size={16} className="text-green-500" />
+                                       ) : (
+                                          <ShieldX size={16} className="text-red-500" />
+                                       )}
+                                    </div>
+                                 )}
                               </div>
                               <p className="text-[9px] text-slate-600 uppercase font-black tracking-[0.1em] leading-relaxed max-w-2xl">
                                  Ensure the destination address is correctly formatted. All transfers are processed through the Orion High-Speed Relay to ensure minimal slippage and maximum privacy on the target chain.
