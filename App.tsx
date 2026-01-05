@@ -116,6 +116,7 @@ const App: React.FC = () => {
    const [performanceStats, setPerformanceStats] = useState(APEX_STRATEGY_NODES.map(() => 0));
 
    const [matrixStatus, setMatrixStatus] = useState<any>(null);
+   const [botFleet, setBotFleet] = useState<any>(null);
 
    // Backend Connection Logic
    type ConnectionStatus = 'IDLE' | 'PROBING' | 'ONLINE' | 'OFFLINE';
@@ -228,6 +229,25 @@ const App: React.FC = () => {
       const interval = setInterval(fetchAuditedStats, 15000); // Audit every 15s
       return () => clearInterval(interval);
    }, [BACKEND_URL, connectionStatus]);
+
+   useEffect(() => {
+      const pollBots = async () => {
+         if (!engineStarted || connectionStatus !== 'ONLINE') return;
+         try {
+            const res = await fetch(`${BACKEND_URL}/api/bots/status`);
+            if (res.ok) {
+               const data = await res.json();
+               setBotFleet(data);
+            }
+         } catch (e) {
+            console.error("Bot poll failed", e);
+         }
+      };
+
+      pollBots();
+      const interval = setInterval(pollBots, 3000); // 3s poll for bot swarm
+      return () => clearInterval(interval);
+   }, [engineStarted, connectionStatus, BACKEND_URL]);
 
    useEffect(() => {
       const checkBackend = async () => {
@@ -587,6 +607,100 @@ const App: React.FC = () => {
                               <div className="flex items-center gap-2 mt-4">
                                  <ShieldCheck size={14} className="text-[#10b981]" />
                                  <span className="text-[9px] font-black text-white uppercase">Neural Stability Verified</span>
+                              </div>
+                           </div>
+
+                           {/* TRI-TIER BOT FLEET MONITORING */}
+                           <div className="flex flex-col gap-6 mt-8">
+                              <div className="flex items-center gap-3">
+                                 <div className="p-2 bg-slate-800 rounded-lg">
+                                    <Layers size={14} className="text-white" />
+                                 </div>
+                                 <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Tri-Tier Bot Fleet</h3>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                 {/* TIER 1: SCANNERS */}
+                                 <div className="p-6 rounded-2xl bg-black/40 border border-white/5 flex flex-col gap-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tier 1: Scanners</span>
+                                       <span className="text-[10px] font-black text-blue-400 font-mono">
+                                          {botFleet?.scanners?.length || 0} Nodes
+                                       </span>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                       {botFleet?.scanners?.map((s: any, i: number) => (
+                                          <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.03]">
+                                             <div className="flex items-center gap-3">
+                                                <ScanEye size={12} className="text-blue-400" />
+                                                <div className="flex flex-col">
+                                                   <span className="text-[9px] font-black text-white">{s.id}</span>
+                                                   <span className="text-[7px] font-bold text-slate-600 uppercase tracking-tighter">{s.type}</span>
+                                                </div>
+                                             </div>
+                                             <div className="flex items-center gap-4">
+                                                <div className="flex flex-col items-end">
+                                                   <span className="text-[7px] font-black text-slate-500 uppercase tracking-tighter">Hits</span>
+                                                   <span className="text-[9px] font-mono font-black text-blue-400">{s.hits}</span>
+                                                </div>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${s.status === 'SCANNING' ? 'bg-blue-400 animate-pulse' : 'bg-slate-800'}`} />
+                                             </div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+
+                                 {/* TIER 2: CAPTAIN */}
+                                 <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/5 to-transparent border border-amber-500/10 flex flex-col gap-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Tier 2: Orchestrator</span>
+                                       <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${botFleet?.captain?.status === 'ACTIVE' ? 'bg-amber-500 text-black' : 'bg-slate-800 text-slate-500'}`}>
+                                          {botFleet?.captain?.status || 'IDLE'}
+                                       </div>
+                                    </div>
+                                    <div className="flex flex-col gap-6 py-4 justify-center items-center flex-1">
+                                       <div className="relative">
+                                          <div className={`absolute inset-0 rounded-full blur-xl transition-all duration-1000 ${botFleet?.captain?.status === 'ACTIVE' ? 'bg-amber-500/20 scale-150' : 'bg-transparent'}`} />
+                                          <div className={`w-16 h-16 rounded-3xl border-2 flex items-center justify-center relative transition-all duration-500 ${botFleet?.captain?.status === 'ACTIVE' ? 'border-amber-500/50 bg-amber-500/10 rotate-45' : 'border-white/10 bg-white/5'}`}>
+                                             <BrainCircuit size={28} className={`transition-all duration-500 ${botFleet?.captain?.status === 'ACTIVE' ? 'text-amber-500 -rotate-45' : 'text-slate-700'}`} />
+                                          </div>
+                                       </div>
+                                       <div className="flex flex-col items-center gap-1">
+                                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Decision Cycle</span>
+                                          <span className="text-lg font-mono font-black text-white">{botFleet?.captain?.decisionCycleMs || 0}ms</span>
+                                       </div>
+                                    </div>
+                                    <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                                       <span>Pending Actions</span>
+                                       <span className="text-amber-500">{botFleet?.captain?.pendingOrders || 0}</span>
+                                    </div>
+                                 </div>
+
+                                 {/* TIER 3: EXECUTORS */}
+                                 <div className="p-6 rounded-2xl bg-black/40 border border-white/5 flex flex-col gap-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tier 3: Executors</span>
+                                       <span className="text-[10px] font-black text-[#10b981] font-mono">
+                                          {botFleet?.executors?.length || 0} Agents
+                                       </span>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                       {botFleet?.executors?.map((e: any, i: number) => (
+                                          <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.03]">
+                                             <div className="flex items-center gap-3">
+                                                <Zap size={12} className={e.busy ? 'text-[#10b981] animate-pulse' : 'text-slate-600'} />
+                                                <div className="flex flex-col">
+                                                   <span className="text-[9px] font-black text-white">{e.id}</span>
+                                                   <span className="text-[7px] font-bold text-slate-600 uppercase tracking-tighter">{e.capability}</span>
+                                                </div>
+                                             </div>
+                                             <div className={`px-2 py-0.5 rounded-[4px] text-[6px] font-black uppercase tracking-widest ${e.busy ? 'bg-[#10b981]/10 text-[#10b981]' : 'bg-slate-900 text-slate-700'}`}>
+                                                {e.busy ? 'BUSY' : 'READY'}
+                                             </div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
                               </div>
                            </div>
                         </div>
