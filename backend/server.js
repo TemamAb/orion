@@ -45,27 +45,9 @@ if (process.env.NODE_ENV !== 'production') {
 // Middleware
 app.use(helmet(securityHeaders));
 
-const crossOriginList = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:3000', 'http://localhost:5173', 'https://orion-alpha.onrender.com'];
-
+// Permissive CORS for initial Render deployment debugging
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-
-    const isAllowed = crossOriginList.some(allowed => {
-      const normalizedAllowed = allowed.replace(/\/$/, "");
-      const normalizedOrigin = origin.replace(/\/$/, "");
-      return normalizedOrigin === normalizedAllowed || allowed === '*';
-    });
-
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      logger.warn(`CORS Blocked: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Reflect request origin
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -107,11 +89,13 @@ app.get('/api/status', async (req, res) => {
     const dbStatus = mongoose.connection.readyState === 1;
     const redisStatus = redisClient.isOpen;
 
+    const blockchainStatus = await blockchainService.getStatus();
+
     res.json({
       database: dbStatus ? 'connected' : 'disconnected',
       redis: redisStatus ? 'connected' : 'disconnected',
       aiService: aiService.isReady ? 'ready' : 'not ready',
-      blockchain: blockchainService.isConnected ? 'connected' : 'disconnected'
+      blockchain: blockchainStatus
     });
   } catch (error) {
     logger.error('Status check error:', error);
@@ -341,8 +325,9 @@ async function initializeServices() {
 }
 
 // Start server
-app.listen(PORT, async () => {
-  logger.info(`Server running on port ${PORT}`);
+const host = '0.0.0.0';
+app.listen(PORT, host, async () => {
+  logger.info(`Server running on http://${host}:${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Initialize services after server starts

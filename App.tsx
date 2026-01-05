@@ -117,6 +117,7 @@ const App: React.FC = () => {
    // Backend Connection Logic
    type ConnectionStatus = 'IDLE' | 'PROBING' | 'ONLINE' | 'OFFLINE';
    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('IDLE');
+   const [serverStatus, setServerStatus] = useState<any>(null);
 
    // Exact Discovery Logic:
    // 1. Check build-time env var
@@ -208,12 +209,18 @@ const App: React.FC = () => {
          setConnectionStatus('PROBING');
          try {
             console.log(`[Orion] Probing Health: ${BACKEND_URL}/api/health`);
-            const res = await fetch(`${BACKEND_URL}/api/health`);
-            if (res.ok) {
-               console.log("[Orion] Backend Online");
+            const hRes = await fetch(`${BACKEND_URL}/api/health`);
+
+            if (hRes.ok) {
+               console.log("[Orion] Backend Online. Fetching System Intel...");
+               const sRes = await fetch(`${BACKEND_URL}/api/status`);
+               if (sRes.ok) {
+                  const sData = await sRes.json();
+                  setServerStatus(sData);
+               }
                setConnectionStatus('ONLINE');
             } else {
-               console.warn(`[Orion] Backend Health Check Failed: ${res.status}`);
+               console.warn(`[Orion] Backend Health Check Failed: ${hRes.status}`);
                setConnectionStatus('OFFLINE');
             }
          } catch (e) {
@@ -775,6 +782,12 @@ const App: React.FC = () => {
                         {engineStarted ? 'SYSTEM_STATE: RUNNING' : 'SYSTEM_STATE: STANDBY'}
                      </span>
                   </div>
+                  {serverStatus?.blockchain?.mode === 'VANTAGE_GASLESS' && (
+                     <div className="flex items-center gap-2 px-2 py-0.5 rounded border border-[#10b981]/30 bg-[#10b981]/5">
+                        <div className="w-1 h-1 rounded-full bg-[#10b981] animate-pulse" />
+                        <span className="text-[7px] font-black text-[#10b981] uppercase tracking-tighter">VANTAGE_MODE: ACTIVE (GASLESS)</span>
+                     </div>
+                  )}
                </div>
                <span className="text-[8px] font-black text-slate-700 uppercase tracking-widest font-mono">&copy; 2025 ORION_TERMINAL</span>
             </footer>
