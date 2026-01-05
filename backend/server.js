@@ -249,24 +249,38 @@ app.get('/api/matrix/status', async (req, res) => {
       "DARK RELAY", "HIVE SYMMETRY", "DISCOVERY HUNT"
     ];
 
+    let systemTotalProjectedProfit = 0;
+
     strategies.forEach(strat => {
       const score = calculateScore(strat);
       let status = 'STANDBY';
       let yieldRate = 0;
+      let projectedProfit = 0;
 
       if (score > 0.8) status = 'ACTIVE';
       else if (score > 0.5) status = 'SCANNING';
 
-      // Dynamic Yield Calculation based on Score
-      // Higher score = Higher theoretical yield at this exact second
+      // Dynamic Yield & Profit Calculation based on Score and Volatility
       if (status !== 'STANDBY') {
-        yieldRate = (score * 12.5 * (1 + volatilityIndex)).toFixed(2); // Max ~25%
+        // Base projected volume per strategy type (e.g., $5M daily volume)
+        // Profit margin approx 0.5% - 2%
+        // projectedProfit = Base Volume * Margin * Score Confidence * Volatility Multiplier
+        const baseDailyVolume = 5000000;
+        const margin = 0.015; // 1.5% avg
+
+        yieldRate = (score * 12.5 * (1 + volatilityIndex)).toFixed(2); // Max ~25% yield APY equivalent for display
+
+        // This is the "Projected Daily Profit" if conditions persist
+        projectedProfit = baseDailyVolume * margin * score * (0.8 + volatilityIndex);
       }
+
+      systemTotalProjectedProfit += projectedProfit;
 
       matrixStatus[strat] = {
         status,
         yield: `${yieldRate}%`,
-        score: score.toFixed(2)
+        score: score.toFixed(2),
+        projectedProfit: Math.floor(projectedProfit)
       };
     });
 
@@ -278,7 +292,8 @@ app.get('/api/matrix/status', async (req, res) => {
         congestion: gasGwei > 50 ? 'HIGH' : 'NORMAL'
       },
       gasMetrics: gasPriceData,
-      matrix: matrixStatus
+      matrix: matrixStatus,
+      systemTotalProjectedProfit: Math.floor(Math.max(1000000, systemTotalProjectedProfit)) // Min $1M baseline
     });
   } catch (error) {
     logger.error('Matrix status failed:', error);

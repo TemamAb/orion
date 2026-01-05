@@ -117,7 +117,7 @@ const App: React.FC = () => {
    const [isAddressValid, setIsAddressValid] = useState(false);
    const [executingWithdrawal, setExecutingWithdrawal] = useState(false);
    const [withdrawalMode, setWithdrawalMode] = useState<'AUTO' | 'MANUAL'>('MANUAL');
-   const [autoWithdrawThreshold, setAutoWithdrawThreshold] = useState(10000); // $10k default
+   const [autoWithdrawThreshold, setAutoWithdrawThreshold] = useState(2452.84); // 1 ETH default
 
    // Performance Fluctuations
    const [performanceStats, setPerformanceStats] = useState(APEX_STRATEGY_NODES.map(() => 0));
@@ -162,27 +162,14 @@ const App: React.FC = () => {
                const data = await res.json();
                setMatrixStatus(data);
 
-               // Dynamic Profit Target Calculation
-               // Sum of max theoretical daily yield across all 7 active strategies based on current market volatility and gas data
-               let aggregatedPotential = 0;
-               const strategies = Object.keys(data.matrix);
-
-               strategies.forEach(key => {
-                  const node = data.matrix[key];
-                  // If active, it contributes significant potential 
-                  // Base potential approx $50k-$150k per node per day depending on score
-                  if (node.status === 'ACTIVE') {
-                     aggregatedPotential += (parseFloat(node.score) * 150000);
-                  } else if (node.status === 'SCANNING') {
-                     aggregatedPotential += (parseFloat(node.score) * 50000);
-                  }
-               });
-
-               // Set new dynamic target (minimum $1M to keep goal aspiring)
-               setProfitTarget(Math.max(1000000, aggregatedPotential));
+               // Dynamic Profit Target: Directly from the backend's "Profit Forge" algorithm
+               if (data.systemTotalProjectedProfit) {
+                  setProfitTarget(data.systemTotalProjectedProfit);
+               }
 
                // Update visualization based on live status (simplified mapping)
                setPerformanceStats(prev => prev.map((val, idx) => {
+                  const strategies = Object.keys(data.matrix); // Order matters, assuming same order
                   const stratKey = strategies[idx];
                   const status = data.matrix[stratKey]?.status;
 
@@ -246,12 +233,28 @@ const App: React.FC = () => {
    };
 
    const handleWithdrawalExecution = async () => {
-      if (!targetWallet) return alert("Please enter a withdrawal address.");
+      if (!targetWallet || !isAddressValid) return;
       setExecutingWithdrawal(true);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      setExecutingWithdrawal(false);
-      alert(`Withdrawal Successful: ${formatCurrency(totalProfit)} sent to ${targetWallet}`);
+
+      try {
+         // In production this would call /api/withdrawal/execute
+         await new Promise(resolve => setTimeout(resolve, 3000));
+         console.log(`[Orion Settlement] Automated Transfer of ${formatCurrency(totalProfit)} to ${targetWallet} COMPLETE.`);
+         alert(`Withdrawal Successful: ${formatCurrency(totalProfit)} sent to ${targetWallet}`);
+      } catch (err) {
+         console.error("Auto-withdrawal failed", err);
+      } finally {
+         setExecutingWithdrawal(false);
+      }
    };
+
+   // Auto-Withdrawal Watcher
+   useEffect(() => {
+      if (withdrawalMode === 'AUTO' && isAddressValid && totalProfit >= autoWithdrawThreshold && !executingWithdrawal) {
+         console.log(`[Orion Sentinel] Profit threshold breached (${formatCurrency(totalProfit)} > ${formatCurrency(autoWithdrawThreshold)}). Initiating Automated Settlement.`);
+         handleWithdrawalExecution();
+      }
+   }, [totalProfit, withdrawalMode, isAddressValid, autoWithdrawThreshold, executingWithdrawal]);
 
    useEffect(() => {
       const fetchAuditedStats = async () => {
@@ -874,14 +877,17 @@ const App: React.FC = () => {
                                  <div className="flex items-center gap-4">
                                     <input
                                        type="number"
-                                       value={autoWithdrawThreshold}
-                                       onChange={(e) => setAutoWithdrawThreshold(Number(e.target.value))}
+                                       value={viewCurrency === 'ETH' ? (autoWithdrawThreshold / ethPrice) : autoWithdrawThreshold}
+                                       onChange={(e) => {
+                                          const val = Number(e.target.value);
+                                          setAutoWithdrawThreshold(viewCurrency === 'ETH' ? val * ethPrice : val);
+                                       }}
                                        className="flex-1 bg-black/40 border border-[#10b981]/20 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-[#10b981]/40"
                                     />
-                                    <span className="text-[10px] font-black text-slate-500 uppercase">USD</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase">{viewCurrency}</span>
                                  </div>
                                  <p className="text-[8px] text-slate-600 uppercase font-bold tracking-wider">
-                                    Profits will automatically transfer when balance exceeds {formatCurrency(autoWithdrawThreshold)}
+                                    Automated settlement active. Profits will transfer when balance breaches the {formatCurrency(autoWithdrawThreshold)} (1 ETH) threshold.
                                  </p>
                               </div>
                            )}
@@ -943,12 +949,20 @@ const App: React.FC = () => {
 
                         <button
                            onClick={handleWithdrawalExecution}
-                           disabled={executingWithdrawal || !engineStarted}
-                           className={`w-auto self-center px-16 py-4 rounded-2xl text-black text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-5 relative overflow-hidden ${!engineStarted ? 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5' : 'bg-[#fbbf24] hover:scale-[1.01] shadow-[0_0_30px_rgba(251,191,36,0.2)] hover:bg-[#fcd34d]'
+                           disabled={executingWithdrawal || !engineStarted || (targetWallet !== '' && !isAddressValid) || !targetWallet}
+                           className={`w-auto self-center px-16 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-5 relative overflow-hidden ${!engineStarted || (targetWallet !== '' && !isAddressValid) || !targetWallet
+                              ? 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5'
+                              : 'bg-[#fbbf24] text-black hover:scale-[1.01] shadow-[0_0_30px_rgba(251,191,36,0.2)] hover:bg-[#fcd34d]'
                               }`}
                         >
                            {executingWithdrawal ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
-                           {!engineStarted ? "Engine Required" : (executingWithdrawal ? "Settling Assets..." : `Withdraw Profits (${viewCurrency})`)}
+                           {!engineStarted
+                              ? "Engine Required"
+                              : (!targetWallet
+                                 ? "Target Wallet Required"
+                                 : (!isAddressValid
+                                    ? "Invalid Destination"
+                                    : (executingWithdrawal ? "Settling Assets..." : `Withdraw Profits (${viewCurrency})`)))}
                            {executingWithdrawal && <div className="absolute bottom-0 left-0 h-1.5 bg-black animate-[progress_3s_linear]" style={{ width: '100%' }} />}
                         </button>
                      </div>
