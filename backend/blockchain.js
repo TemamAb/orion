@@ -43,19 +43,20 @@ class BlockchainService {
       const privateKey = process.env.PRIVATE_KEY;
       if (privateKey) {
         this.signer = new ethers.Wallet(privateKey, this.provider);
+        logger.info('Wallet connected. Active Execution Mode enabled.');
       } else {
-        logger.warn("Private key missing. Read-only mode active.");
+        logger.warn("Private Key not found. Blockchain Service switching to SENTINEL MODE (Read-Only).");
+        this.signer = null;
       }
 
       logger.info(`Blockchain service initialized for ${chain} network`);
 
-      // Initialize contracts
+      // Initialize contracts (Read-only if no signer)
       await this.initializeContracts(chain);
       this.isConnected = true;
     } catch (error) {
       logger.error('Failed to initialize blockchain service:', error);
       this.isConnected = false;
-      // Do not throw, allow app to start in disconnected state if RPC fails
     }
   }
 
@@ -87,8 +88,16 @@ class BlockchainService {
   }
 
   async executeFlashLoanArbitrage(params) {
-    if (!this.signer || !this.flashLoanContract) {
-      return { success: false, error: "Wallet or Contract not initialized for execution" };
+    if (!this.signer) {
+      logger.warn("Execution attempted in Sentinel Mode.");
+      return {
+        success: false,
+        error: "SENTINEL_MODE_ACTIVE: Private Key required for autonomous execution. Engine is currently in Monitoring state."
+      };
+    }
+
+    if (!this.flashLoanContract) {
+      return { success: false, error: "Flash Loan Contract not initialized" };
     }
 
     try {
