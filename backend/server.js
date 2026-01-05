@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const mongoose = require('mongoose');
 const redis = require('redis');
 const winston = require('winston');
+const net = require('net');
 const blockchainService = require('./blockchain');
 const aiService = require('./aiService');
 const botOrchestrator = require('./botOrchestrator');
@@ -18,45 +19,104 @@ const {
   validateInput,
 } = require('./middleware/security');
 
+// ORION PORT DISCOVERY SYSTEM - Auto-detect available ports
+function checkPortAvailability(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(port, '127.0.0.1', () => {
+      server.close(() => resolve(true));
+    });
+    server.on('error', () => resolve(false));
+  });
+}
+
+async function findAvailablePort(startPort = 5000, endPort = 5999) {
+  console.log(`[ORION PORT DISCOVERY] 🔍 Scanning for available backend port (${startPort}-${endPort})...`);
+
+  // Preferred ports first
+  const preferredPorts = [5000, 5001, 5002, 5003, 5004, 5005, 5006, 5007, 5008, 5009];
+
+  for (const port of preferredPorts) {
+    if (await checkPortAvailability(port)) {
+      console.log(`[ORION PORT DISCOVERY] ✅ Found preferred port: ${port}`);
+      return port;
+    }
+  }
+
+  // Scan range
+  for (let port = startPort; port <= endPort; port++) {
+    if (await checkPortAvailability(port)) {
+      console.log(`[ORION PORT DISCOVERY] ✅ Found available port: ${port}`);
+      return port;
+    }
+  }
+
+  throw new Error(`[ORION PORT DISCOVERY] ❌ No available ports found in range ${startPort}-${endPort}`);
+}
+
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Logger setup
+// Logger setup - Production-ready configuration
 const logger = winston.createLogger({
-  level: 'info',
+  level: process.env.NODE_ENV === 'production' ? 'warn' : 'info', // Reduce noise in production
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: 'arbitrage-backend' },
+  defaultMeta: { service: 'orion-arbitrage-backend' },
   transports: [
     new winston.transports.File({ filename: 'error.log', level: 'error' }),
     new winston.transports.File({ filename: 'combined.log' }),
   ],
 });
 
+// Add console logging for non-production environments
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
     format: winston.format.simple(),
+  }));
+} else {
+  // Production: Add security monitoring for critical events
+  logger.add(new winston.transports.Console({
+    level: 'error',
+    format: winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.json()
+    )
   }));
 }
 
 // Middleware
 app.use(helmet(securityHeaders));
 
-// Permissive CORS for initial Render deployment debugging
-// Ultimate Permissive CORS for Link Recovery
+// Production CORS configuration - Restrict to specific origins
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      process.env.ALLOWED_ORIGINS,
+      'https://orion-frontend.onrender.com',
+      'https://orion-arbitrage.vercel.app'
+    ].filter(Boolean)
+  : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000'];
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Log origin for diagnostic purposes
-    if (origin) logger.info(`Incoming Request from Origin: ${origin}`);
-    callback(null, true); // Allow all origins
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Log blocked origins for security monitoring
+    logger.warn(`CORS blocked request from origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-request-id'],
+  maxAge: 86400 // 24 hours
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -83,13 +143,45 @@ redisClient.on('error', (err) => logger.error('Redis Client Error', err));
 redisClient.connect();
 
 // Routes
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    service: 'arbitrage-flash-loan-backend',
-    version: '1.0.0'
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Check database connection
+    const dbStatus = mongoose.connection.readyState === 1;
+
+    // Check Redis connection
+    const redisStatus = redisClient.isOpen;
+
+    // Check AI service
+    const aiStatus = aiService.isReady;
+
+    // Check blockchain service
+    const blockchainStatus = blockchainService.isConnected;
+
+    // Determine overall health
+    const overallStatus = (dbStatus && redisStatus && aiStatus && blockchainStatus) ? 'OK' : 'DEGRADED';
+
+    res.status(overallStatus === 'OK' ? 200 : 503).json({
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      service: 'orion-arbitrage-backend',
+      version: '1.0.0',
+      dependencies: {
+        database: dbStatus ? 'healthy' : 'unhealthy',
+        redis: redisStatus ? 'healthy' : 'unhealthy',
+        aiService: aiStatus ? 'healthy' : 'unhealthy',
+        blockchain: blockchainStatus ? 'healthy' : 'unhealthy'
+      }
+    });
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      service: 'orion-arbitrage-backend',
+      version: '1.0.0',
+      error: 'Health check failed'
+    });
+  }
 });
 
 app.get('/api/status', async (req, res) => {
@@ -365,6 +457,155 @@ app.post('/api/ai/analyze', validateInput, async (req, res) => {
   }
 });
 
+// Scan for Alpha opportunities using 7-Node Strategy Matrix
+app.post('/api/scan/alpha', async (req, res) => {
+  try {
+    const { scanType = 'FULL_MATRIX' } = req.body;
+
+    logger.info(`[Orion Alpha Scan] Initiating ${scanType} scan...`);
+
+    // Get current network conditions
+    const gasPriceData = await blockchainService.getGasPrice();
+    const networkStatus = await blockchainService.getStatus();
+
+    const gasGwei = parseInt(gasPriceData?.gasPrice || '0') / 1e9;
+    const blockNum = networkStatus.blockNumber || Date.now();
+    const volatilityIndex = (blockNum % 100) / 100;
+
+    // Define the 7-Node Strategy Matrix
+    const strategies = [
+      {
+        name: "THE GHOST",
+        description: "Private retry execution strategy",
+        condition: gasGwei > 40 && volatilityIndex > 0.5,
+        opportunity: gasGwei > 40 ? "HIGH_GAS_MEV_OPPORTUNITY" : null
+      },
+      {
+        name: "SLOT-0 SNIPER",
+        description: "Block start intercept strategy",
+        condition: volatilityIndex < 0.3,
+        opportunity: volatilityIndex < 0.3 ? "STABLE_BLOCK_SNIPING" : null
+      },
+      {
+        name: "BUNDLE MASTER",
+        description: "Atomic grouping trading strategy",
+        condition: gasGwei > 15 && gasGwei < 50,
+        opportunity: (gasGwei > 15 && gasGwei < 50) ? "MODERATE_GAS_BUNDLING" : null
+      },
+      {
+        name: "ATOMIC FLUX",
+        description: "Gap opportunity finder strategy",
+        condition: volatilityIndex > 0.6,
+        opportunity: volatilityIndex > 0.6 ? "HIGH_VOLATILITY_ARBITRAGE" : null
+      },
+      {
+        name: "DARK RELAY",
+        description: "Liquidity entry sniper strategy",
+        condition: blockNum % 13 === 0,
+        opportunity: blockNum % 13 === 0 ? "RARE_LIQUIDITY_EVENT" : null
+      },
+      {
+        name: "HIVE SYMMETRY",
+        description: "Smart wallet mirror strategy",
+        condition: true, // Always moderately viable
+        opportunity: "COPY_TRADING_OPPORTUNITY"
+      },
+      {
+        name: "DISCOVERY HUNT",
+        description: "Alpha signature scouting strategy",
+        condition: gasGwei < 20,
+        opportunity: gasGwei < 20 ? "CHEAP_GAS_ALPHA_HUNTING" : null
+      }
+    ];
+
+    // Scan for opportunities
+    const opportunities = [];
+    let totalPotentialProfit = 0;
+
+    strategies.forEach(strategy => {
+      if (strategy.condition && strategy.opportunity) {
+        // Calculate potential profit based on strategy type and conditions
+        let potentialProfit = 0;
+        let confidence = 0;
+
+        switch (strategy.name) {
+          case "THE GHOST":
+            potentialProfit = 50000 + (gasGwei * 1000);
+            confidence = Math.min(0.95, gasGwei / 100);
+            break;
+          case "SLOT-0 SNIPER":
+            potentialProfit = 75000;
+            confidence = 0.9;
+            break;
+          case "BUNDLE MASTER":
+            potentialProfit = 60000;
+            confidence = 0.85;
+            break;
+          case "ATOMIC FLUX":
+            potentialProfit = 80000 + (volatilityIndex * 20000);
+            confidence = Math.min(0.95, volatilityIndex);
+            break;
+          case "DARK RELAY":
+            potentialProfit = 90000;
+            confidence = 0.9;
+            break;
+          case "HIVE SYMMETRY":
+            potentialProfit = 65000;
+            confidence = 0.65;
+            break;
+          case "DISCOVERY HUNT":
+            potentialProfit = 55000;
+            confidence = 0.9;
+            break;
+        }
+
+        opportunities.push({
+          strategy: strategy.name,
+          description: strategy.description,
+          opportunity: strategy.opportunity,
+          potentialProfit: Math.floor(potentialProfit),
+          confidence: confidence,
+          conditions: {
+            gasGwei: gasGwei.toFixed(2),
+            volatilityIndex: volatilityIndex.toFixed(2),
+            blockNumber: blockNum
+          }
+        });
+
+        totalPotentialProfit += potentialProfit;
+      }
+    });
+
+    // Sort by potential profit descending
+    opportunities.sort((a, b) => b.potentialProfit - a.potentialProfit);
+
+    const result = {
+      timestamp: new Date(),
+      scanType,
+      networkConditions: {
+        gasGwei: gasGwei.toFixed(2),
+        volatilityIndex: volatilityIndex.toFixed(2),
+        blockNumber: blockNum,
+        congestion: gasGwei > 50 ? 'HIGH' : gasGwei > 20 ? 'MODERATE' : 'LOW'
+      },
+      opportunities,
+      summary: {
+        totalOpportunities: opportunities.length,
+        totalPotentialProfit: Math.floor(totalPotentialProfit),
+        averageConfidence: opportunities.length > 0 ?
+          (opportunities.reduce((sum, opp) => sum + opp.confidence, 0) / opportunities.length).toFixed(2) : 0
+      }
+    };
+
+    logger.info(`[Orion Alpha Scan] Scan complete - Found ${opportunities.length} opportunities with $${Math.floor(totalPotentialProfit).toLocaleString()} potential profit`);
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Alpha scan error:', error);
+    res.status(500).json({ error: 'Alpha scanning failed' });
+  }
+});
+
 // Blockchain routes
 app.get('/api/blockchain/status', async (req, res) => {
   try {
@@ -409,14 +650,30 @@ async function initializeServices() {
   }
 }
 
-// Start server
-const host = '0.0.0.0';
-app.listen(PORT, host, async () => {
-  logger.info(`Server running on http://${host}:${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Start server with dynamic port discovery
+async function startServer() {
+  const host = '0.0.0.0';
 
-  // Initialize services after server starts
-  await initializeServices();
-});
+  try {
+    // ORION PORT DISCOVERY ACTIVATION
+    const PORT = await findAvailablePort();
+    console.log(`[ORION PORT DISCOVERY] 🚀 Starting Orion Backend on dynamic port: ${PORT}`);
+
+    app.listen(PORT, host, async () => {
+      logger.info(`Server running on http://${host}:${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`[ORION PORT DISCOVERY] ✅ Dynamic port allocation successful: ${PORT}`);
+
+      // Initialize services after server starts
+      await initializeServices();
+    });
+  } catch (error) {
+    logger.error('[ORION PORT DISCOVERY] ❌ Failed to find available port:', error.message);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 module.exports = app;

@@ -1,5 +1,5 @@
 services:
-  # Backend Service
+  # Backend Service - ORION APEX INTELLIGENCE TERMINAL
   - type: web
     name: orion-backend
     env: node
@@ -10,20 +10,78 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 5000
+      # Remove fixed PORT to allow dynamic port discovery
       - key: ALLOWED_ORIGINS
         fromService:
           type: static_site
           name: orion-frontend
           property: url
+      # Use Render service discovery for database connections
       - key: MONGODB_URI
-        value: mongodb://mongo:27017/arbitrage
+        fromService:
+          type: private_service
+          name: mongo
+          property: connectionString
       - key: REDIS_URL
-        value: redis://redis:6379
+        fromService:
+          type: private_service
+          name: redis
+          property: connectionString
+      # Required API keys with fallbacks for Render deployment
+      - key: GEMINI_API_KEY
+        fromSecret: gemini-api-key
+      - key: PIMLICO_API_KEY
+        fromSecret: pimlico-api-key
+      - key: ETH_RPC_URL
+        value: https://mainnet.infura.io/v3/YOUR_INFURA_KEY
+      - key: BASE_RPC_URL
+        value: https://mainnet.base.org
+      - key: ARB_RPC_URL
+        value: https://arb1.arbitrum.io/rpc
+      # Security secrets with fallbacks
+      - key: JWT_SECRET
+        value: orion-production-jwt-secret-2024
+      - key: API_KEY
+        value: orion-production-api-key-2024
+      - key: SMART_ACCOUNT_ADDRESS
+        value: ""  # Will be set via session authorization
+      # Flash Loan Provider Addresses
+      - key: AAVE_V3_POOL_ADDRESS
+        value: 0x87870Bcd6C7e3Dc0891e5F30E8e1C4E9F3a6E8Bc
+      - key: BALANCER_V2_VAULT_ADDRESS
+        value: 0xBA12222222228d8Ba445958a75a0704d566BF2C8
+      - key: MAKERDAO_DAI_JOIN_ADDRESS
+        value: 0x9759A6Ac90977b93B58547b4A71c78317f391A28
+      - key: COMPOUND_V2_ADDRESS
+        value: 0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B
+      - key: AAVE_V3_BASE_POOL_ADDRESS
+        value: 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5c
+      - key: COMPOUND_V3_BASE_ADDRESS
+        value: 0xb125E6687d4313864e53df431d5425969c15Eb026
+      - key: MOONWELL_BASE_ADDRESS
+        value: 0x8E00D5e02E65A19337Cdba98bbA9F84d4186a1804
+      - key: AAVE_V3_ARB_POOL_ADDRESS
+        value: 0x794a61358D6845594F94dc1DB02A252b5b4814aD3
+      - key: COMPOUND_V3_ARB_ADDRESS
+        value: 0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA3
+      - key: BALANCER_V2_ARB_VAULT_ADDRESS
+        value: 0xBA12222222228d8Ba445958a75a0704d566BF2C8
+      # DEX Router Addresses
+      - key: UNISWAP_V2_ROUTER
+        value: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+      - key: UNISWAP_V3_QUOTER
+        value: 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6
+      - key: BASE_SWAP_ROUTER
+        value: 0x327Df1E6de05895d2ab08513aaDD9313fE505d86b
+      - key: AERODROME_ROUTER
+        value: 0xcF77a3Ba9A5CA399B7c97c74d54e5b0D5474133E9
+      - key: ARB_SWAP_ROUTER
+        value: 0x4752ba5DBc23f44D87826276BF6Fd6b1C263D0
+      - key: CAMELOT_ROUTER
+        value: 0xc873fEcbd354f5A56E00E710B90EF4201db2448dF
     healthCheckPath: /api/health
 
-  # Frontend Service
+  # Frontend Service - ORION DASHBOARD
   - type: static_site
     name: orion-frontend
     env: static
@@ -37,14 +95,17 @@ services:
           name: orion-backend
           property: url
 
-  # Database Service (Private)
+  # Database Service (Private) - ORION DATA VAULT
   - type: private_service
     name: mongo
     env: docker
     image: mongo:6.0
     plan: starter
+    envVars:
+      - key: MONGO_INITDB_DATABASE
+        value: orion_arbitrage
 
-  # Cache Service (Private)
+  # Cache Service (Private) - ORION MEMORY CORE
   - type: private_service
     name: redis
     env: docker

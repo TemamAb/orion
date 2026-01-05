@@ -19,6 +19,8 @@ class AIService {
     this.isReady = false;
     this.MAX_RETRIES = 3;
     this.BASE_DELAY = 1000;
+    this.cache = new Map(); // Cache for AI responses
+    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
   }
 
   async initialize() {
@@ -29,6 +31,9 @@ class AIService {
       }
       this.ai = new GoogleGenAI({ apiKey });
       logger.info('AI service initialized');
+
+      // Start periodic cache cleanup
+      setInterval(() => this.cleanCache(), 10 * 60 * 1000); // Clean every 10 minutes
     } catch (error) {
       logger.error('Failed to initialize AI service:', error);
       throw error;
@@ -47,6 +52,36 @@ class AIService {
           continue;
         }
         throw error;
+      }
+    }
+  }
+
+  // Cache management
+  getCacheKey(method, params) {
+    return `${method}:${JSON.stringify(params)}`;
+  }
+
+  getCachedResult(key) {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data;
+    }
+    if (cached) {
+      this.cache.delete(key); // Remove expired cache
+    }
+    return null;
+  }
+
+  setCachedResult(key, data) {
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
+  // Clean expired cache entries periodically
+  cleanCache() {
+    const now = Date.now();
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.cacheTimeout) {
+        this.cache.delete(key);
       }
     }
   }
@@ -186,6 +221,14 @@ class AIService {
 
   async auditTokenSecurity(tokenAddress, chain = 'ETH') {
     try {
+      // Check cache first
+      const cacheKey = this.getCacheKey('auditTokenSecurity', { tokenAddress, chain });
+      const cachedResult = this.getCachedResult(cacheKey);
+      if (cachedResult) {
+        logger.info(`Token security audit served from cache for ${tokenAddress}`);
+        return cachedResult;
+      }
+
       const prompt = `Audit the smart contract and liquidity resilience for token: ${tokenAddress} on ${chain}.
       Focus on high-tier exit liquidity safety for arbitrage trading.
       Check for:
@@ -215,6 +258,10 @@ class AIService {
 
       const result = JSON.parse(response.text?.trim() || "{}");
       logger.info(`Token security audit completed for ${tokenAddress}`);
+
+      // Cache the result
+      this.setCachedResult(cacheKey, result);
+
       return result;
     } catch (error) {
       logger.error('Token security audit failed:', error);

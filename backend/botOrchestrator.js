@@ -93,10 +93,24 @@ class BotOrchestrator {
         let aiDecision = "HOLD";
 
         if (activeHits > 0 && Math.random() > 0.5) {
-            // Mock AI Decision latency
+            // AI Decision Making
             this.captain.status = 'ANALYZING';
-            // In prod, this calls aiService.optimizeStrategy()
-            aiDecision = "EXECUTE";
+            try {
+                // Get market conditions for AI optimization
+                const marketConditions = {
+                    gasPrice: await blockchainService.getGasPrice(),
+                    networkLoad: activeHits,
+                    volatilityIndex: (Date.now() % 100) / 100 // Mock volatility
+                };
+
+                // Call AI service for strategy optimization and decision
+                const aiOptimization = await aiService.optimizeStrategy({}, marketConditions);
+                aiDecision = aiOptimization.expectedProfit > 0.1 ? "EXECUTE" : "HOLD"; // Threshold for execution
+                logger.info(`AI Decision: ${aiDecision} | Expected Profit: ${aiOptimization.expectedProfit}`);
+            } catch (error) {
+                logger.warn('AI optimization failed, defaulting to HOLD:', error.message);
+                aiDecision = "HOLD";
+            }
         }
 
         // 3. Dispatch Executors
@@ -123,12 +137,33 @@ class BotOrchestrator {
         this.captain.pendingOrders++;
         logger.info(`Captain dispatched ${executor.id} for execution.`);
 
-        // Mock Execution Time (e.g. Flash Loan Tx)
-        setTimeout(() => {
+        try {
+            // Execute Flash Loan Arbitrage Trade
+            // Using sample parameters - in production, these would come from AI analysis or scanner hits
+            const tradeParams = {
+                tokenIn: '0xA0b86a33E6441e88C5F2712C3E9b74Ae1f0f2c4d', // USDC
+                tokenOut: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+                amount: 1000000, // 1M USDC (6 decimals)
+                dexPath: ['Uniswap'] // DEX path for arbitrage
+            };
+
+            logger.info(`Executing flash loan arbitrage: ${tradeParams.amount} ${tradeParams.tokenIn} -> ${tradeParams.tokenOut}`);
+
+            const result = await blockchainService.executeFlashLoanArbitrage(tradeParams);
+
+            if (result.success) {
+                logger.info(`${executor.id} executed trade successfully. Tx: ${result.transactionHash}`);
+            } else {
+                logger.warn(`${executor.id} execution failed: ${result.error}`);
+            }
+
             executor.busy = false;
             this.captain.pendingOrders--;
-            logger.info(`${executor.id} returned successfully.`);
-        }, 4500);
+        } catch (error) {
+            logger.error(`${executor.id} execution error:`, error);
+            executor.busy = false;
+            this.captain.pendingOrders--;
+        }
     }
 
     /**

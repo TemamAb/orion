@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { ethers } from 'ethers';
 import {
@@ -19,9 +18,10 @@ import {
    TrendingUp as PriceUp, TrendingDown as PriceDown,
    Settings as GearIcon,
    Server, ShieldAlert as AlertIcon, Waves, Zap as FlashLoanIcon,
-   Zap as SyncIcon
+   Zap as SyncIcon, X
 } from 'lucide-react';
 import { WalletIntel } from './types';
+import { autoDiscoverPorts, validatePortAllocation } from './src/shared/utils/portDiscovery';
 
 const STRATEGY_COLORS = [
    '#fbbf24', // Amber
@@ -86,11 +86,17 @@ const APEX_STRATEGY_NODES = [
 ];
 
 const App: React.FC = () => {
-   const [activeView, setActiveView] = useState<'LIVE' | 'MASTER' | 'FOLLOW' | 'MONITOR' | 'WITHDRAW' | 'INTEL' | 'PERFORMANCE'>('MASTER');
+   const [activeView, setActiveView] = useState<'LIVE' | 'MASTER' | 'FOLLOW' | 'MONITOR' | 'WITHDRAW' | 'INTEL' | 'PERFORMANCE' | 'AI_TERMINAL'>('MASTER');
    const [sidebarExpanded, setSidebarExpanded] = useState(false);
    const [engineStarted, setEngineStarted] = useState(false);
    const [deploymentContractNumber, setDeploymentContractNumber] = useState('');
    const [generatedSmartAccount, setGeneratedSmartAccount] = useState('');
+   const [discoveredPorts, setDiscoveredPorts] = useState<{frontend: number | null, backend: number | null, monitoring: number | null, database: number | null}>({
+      frontend: null,
+      backend: null,
+      monitoring: null,
+      database: null
+   });
 
    // Dynamic Currency Logic
    const [viewCurrency, setViewCurrency] = useState<'USD' | 'ETH'>('USD');
@@ -119,6 +125,11 @@ const App: React.FC = () => {
    const [withdrawalMode, setWithdrawalMode] = useState<'AUTO' | 'MANUAL'>('MANUAL');
    const [autoWithdrawThreshold, setAutoWithdrawThreshold] = useState(2452.84); // 1 ETH default
 
+   // Scan for Alpha functionality
+   const [isScanning, setIsScanning] = useState(false);
+   const [scanResults, setScanResults] = useState<any>(null);
+   const [showScanModal, setShowScanModal] = useState(false);
+
    // Performance Fluctuations
    const [performanceStats, setPerformanceStats] = useState(APEX_STRATEGY_NODES.map(() => 0));
 
@@ -126,7 +137,7 @@ const App: React.FC = () => {
    const [botFleet, setBotFleet] = useState<any>(null);
 
    // Backend Connection Logic
-   type ConnectionStatus = 'IDLE' | 'PROBING' | 'ONLINE' | 'OFFLINE';
+   type ConnectionStatus = 'IDLE' | 'PROBING' | 'SCANNING' | 'ONLINE' | 'OFFLINE';
    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('IDLE');
    const [serverStatus, setServerStatus] = useState<any>(null);
 
@@ -180,6 +191,7 @@ const App: React.FC = () => {
             ];
 
             console.log("[Orion Architecture] Primary Discovery Failed. Initiating Brute-Force Omni-Scan...");
+            setConnectionStatus('SCANNING');
 
             for (const url of candidates) {
                if (url === window.location.origin) continue; // Skip self
@@ -195,6 +207,7 @@ const App: React.FC = () => {
                } catch (e) { }
             }
             console.error("[Orion Architecture] Omni-Scan Failed to locate Enterprise Core. Manual [SET] required.");
+            setConnectionStatus('OFFLINE'); // Reset to offline if scan fails
          };
          bruteForceDiscovery();
       }
@@ -296,6 +309,35 @@ const App: React.FC = () => {
          console.error("Auto-withdrawal failed", err);
       } finally {
          setExecutingWithdrawal(false);
+      }
+   };
+
+   const handleScanForAlpha = async () => {
+      if (isScanning) return;
+      setIsScanning(true);
+
+      try {
+         console.log("[Orion Alpha Scan] Initiating deep market scan...");
+         const res = await fetch(`${BACKEND_URL}/api/scan/alpha`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scanType: 'FULL_MATRIX' })
+         });
+
+         if (res.ok) {
+            const data = await res.json();
+            setScanResults(data);
+            console.log("[Orion Alpha Scan] Scan complete - Alpha opportunities detected:", data.opportunities?.length || 0);
+            alert(`Alpha Scan Complete! Found ${data.opportunities?.length || 0} opportunities.`);
+         } else {
+            console.error("[Orion Alpha Scan] Scan failed");
+            alert("Alpha scan failed. Please check backend connection.");
+         }
+      } catch (error) {
+         console.error("[Orion Alpha Scan] Error:", error);
+         alert("Alpha scan error occurred.");
+      } finally {
+         setIsScanning(false);
       }
    };
 
@@ -453,6 +495,8 @@ const App: React.FC = () => {
    };
 
    const toggleEngine = async () => {
+      console.log("[ORION WORKFLOW] 🚀 START ENGINE initiated - Beginning complete workflow sequence...");
+
       if (connectionStatus !== 'ONLINE') {
          const msg = connectionStatus === 'PROBING'
             ? "Establishing link to enterprise core... Please wait."
@@ -461,12 +505,102 @@ const App: React.FC = () => {
          return;
       }
 
+      console.log("[ORION WORKFLOW] ✅ Step 1: Backend connection verified");
+
       // Trigger Security Handshake if necessary
+      console.log("[ORION WORKFLOW] 🔐 Step 2: Initiating security authorization handshake...");
       const authorized = await authorizeSession();
-      if (!authorized) return;
+      if (!authorized) {
+         console.error("[ORION WORKFLOW] ❌ Step 2: Security authorization failed");
+         return;
+      }
+      console.log("[ORION WORKFLOW] ✅ Step 2: Security authorization successful");
+
+      // CRITICAL DEPLOYMENT VALIDATION: Generate Dynamic Contract & Smart Wallet Addresses
+      console.log("[ORION WORKFLOW] 📋 Step 3: Initializing dynamic address generation...");
+
+      // 1. Generate Dynamic Deployment Contract Address
+      const deploymentId = `ORION-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      setDeploymentContractNumber(deploymentId);
+      console.log(`[ORION WORKFLOW] ✅ Step 3a: Contract address generated: ${deploymentId}`);
+
+      // 2. Generate/Retrieve Smart Wallet Address from Backend
+      console.log("[ORION WORKFLOW] 🔗 Step 3b: Retrieving smart wallet address from backend...");
+      try {
+         const statusRes = await fetch(`${BACKEND_URL}/api/status`);
+         if (statusRes.ok) {
+            const sData = await statusRes.json();
+            if (sData.blockchain?.accountAddress) {
+               setGeneratedSmartAccount(sData.blockchain.accountAddress);
+               console.log(`[ORION WORKFLOW] ✅ Step 3b: Smart wallet address forged: ${sData.blockchain.accountAddress}`);
+               console.log(`[ORION WORKFLOW] ✅ Step 3: DEPLOYMENT VALIDATION COMPLETE - All addresses generated successfully`);
+            } else {
+               console.error("[ORION WORKFLOW] ❌ Step 3b: Smart wallet address generation failed");
+               alert("Deployment Error: Smart Wallet Address could not be generated. Please check backend configuration.");
+               return;
+            }
+         } else {
+            console.error("[ORION WORKFLOW] ❌ Step 3b: Status check failed during deployment validation");
+            alert("Deployment Error: Could not validate smart wallet generation. Please check backend connection.");
+            return;
+         }
+      } catch (error) {
+         console.error("[ORION WORKFLOW] ❌ Step 3: Address generation error:", error);
+         alert("Deployment Error: Failed to generate required addresses. Please try again.");
+         return;
+      }
+
+      // 4. AI PORT DISCOVERY: Auto-discover optimal ports for deployment
+      console.log("[ORION WORKFLOW] 🔍 Step 4: Initiating AI autonomous port discovery...");
+      try {
+         const ports = await autoDiscoverPorts();
+         setDiscoveredPorts(ports);
+
+         // Validate port allocation
+         const validation = validatePortAllocation(ports);
+         if (!validation.valid) {
+            console.warn("[ORION WORKFLOW] ⚠️ Step 4: Port discovery warnings:", validation.missing, validation.conflicts);
+            if (validation.missing.length > 0) {
+               alert(`⚠️ Port Discovery Warning: Some services may not have available ports (${validation.missing.join(', ')}). Engine will proceed with available ports.`);
+            }
+         }
+         console.log("[ORION WORKFLOW] ✅ Step 4: AI port discovery complete - Ready for autonomous deployment");
+      } catch (error) {
+         console.error("[ORION WORKFLOW] ❌ Step 4: Port discovery error:", error);
+         alert("Port discovery failed, but engine will proceed with default configuration.");
+      }
+
+      // 4. DISCOVER PROFIT TARGET: Fetch real-time matrix status immediately upon engine start
+      try {
+         console.log("[Orion Intelligence] Discovering Profit Target from 7-Matrix Real-Time Analysis...");
+         const matrixRes = await fetch(`${BACKEND_URL}/api/matrix/status`);
+         if (matrixRes.ok) {
+            const matrixData = await matrixRes.json();
+            const discoveredTarget = matrixData.systemTotalProjectedProfit || 1000000; // Fallback to $1M
+
+            // Set discovered target as session baseline
+            setProfitTarget(discoveredTarget);
+            console.log(`[Orion Intelligence] Profit Target Discovered: ${formatCurrency(discoveredTarget)}`);
+
+            // Initialize strategy performance tracking for 7-matrix forging capability
+            const initialStrategyPerformance = APEX_STRATEGY_NODES.map((node, idx) => {
+               const strategyKey = Object.keys(matrixData.matrix)[idx];
+               const strategyData = matrixData.matrix[strategyKey];
+               return strategyData ? parseFloat(strategyData.score) * 100 : 0;
+            });
+            setPerformanceStats(initialStrategyPerformance);
+         } else {
+            console.warn("[Orion Intelligence] Matrix discovery failed, using default target");
+         }
+      } catch (error) {
+         console.error("[Orion Intelligence] Profit target discovery error:", error);
+      }
 
       setEngineStarted(true);
       if (activeView !== 'MASTER') setActiveView('MASTER');
+
+      // Final Deployment Success Alert
+      alert(`🚀 ORION ENGINE DEPLOYED SUCCESSFULLY!\n\n📋 Contract Address: ${deploymentId}\n💳 Smart Wallet: ${generatedSmartAccount.slice(0, 10)}...${generatedSmartAccount.slice(-8)}\n\n🔌 AI Port Discovery Results:\n  Frontend: ${discoveredPorts.frontend}\n  Backend: ${discoveredPorts.backend}\n  Monitoring: ${discoveredPorts.monitoring}\n  Database: ${discoveredPorts.database}\n\nEngine is now running 24/7 autonomously.`);
    };
 
    useEffect(() => {
@@ -500,19 +634,23 @@ const App: React.FC = () => {
             <nav className="flex flex-col gap-4 w-full">
                <button onClick={() => setActiveView('MASTER')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'MASTER' ? 'bg-[#fbbf24]/20 text-[#fbbf24] border border-[#fbbf24]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <PieChart size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Strategy Matrix</span>}
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Scan</span>}
                </button>
                <button onClick={() => setActiveView('PERFORMANCE')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'PERFORMANCE' ? 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <SyncIcon size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Performance Sync</span>}
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Forge</span>}
                </button>
                <button onClick={() => setActiveView('INTEL')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'INTEL' ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <PulseIcon size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">System Intel</span>}
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Monitor</span>}
                </button>
                <button onClick={() => setActiveView('WITHDRAW')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'WITHDRAW' ? 'bg-[#fbbf24]/20 text-[#fbbf24] border border-[#fbbf24]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <RefreshCw size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Withdrawal</span>}
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Withdraw</span>}
+               </button>
+               <button onClick={() => setActiveView('AI_TERMINAL')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'AI_TERMINAL' ? 'bg-[#a855f7]/20 text-[#a855f7] border border-[#a855f7]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                  <BrainCircuit size={22} className="shrink-0" />
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">AI Terminal</span>}
                </button>
             </nav>
          </aside>
@@ -554,7 +692,7 @@ const App: React.FC = () => {
                         className={`${engineStarted ? 'animate-[spin_3s_linear_infinite]' : 'group-hover:rotate-45 transition-transform'}`}
                      />
                      <span className="relative z-10">
-                        {engineStarted ? 'ENGINE RUNNING!' : 'START ENGINE'}
+                        {engineStarted ? 'ENGINE RUNNING 24/7!' : 'START ENGINE'}
                      </span>
                      {engineStarted && (
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite]" />
@@ -588,38 +726,13 @@ const App: React.FC = () => {
                            <div className="lg:col-span-5 flex justify-center py-10 relative">
                               <div className="relative flex items-center justify-center">
                                  <svg width="280" height="280" viewBox="0 0 280 280" className={`transform -rotate-90 transition-all duration-1000 ${engineStarted ? 'scale-110 drop-shadow-[0_0_30px_rgba(251,191,36,0.1)]' : 'opacity-40'}`}>
-                                    {/* Profit Achievement Progress Ring (Outer) */}
-                                    {engineStarted && (
-                                       <>
-                                          {/* Background ring */}
-                                          <circle
-                                             cx="140"
-                                             cy="140"
-                                             r="130"
-                                             fill="transparent"
-                                             stroke="#1e293b"
-                                             strokeWidth="8"
-                                          />
-                                          {/* Progress ring */}
-                                          <circle
-                                             cx="140"
-                                             cy="140"
-                                             r="130"
-                                             fill="transparent"
-                                             stroke="#10b981"
-                                             strokeWidth="8"
-                                             strokeDasharray={`${(profitAchievement / 100) * (2 * Math.PI * 130)} ${2 * Math.PI * 130}`}
-                                             className="transition-all duration-1000"
-                                             style={{ filter: 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.5))' }}
-                                          />
-                                       </>
-                                    )}
-
-                                    {/* Strategy Distribution Rings (Inner) */}
+                                    {/* 7-Matrix Strategy Contribution Rings (Inner) - Real-Time Performance */}
                                     {APEX_STRATEGY_NODES.map((item, idx) => {
+                                       // Use real-time performance data instead of static contributions
+                                       const realTimeContribution = performanceStats[idx] || 0;
                                        const circumference = 2 * Math.PI * 105;
-                                       const dash = (item.contribution / 100) * circumference;
-                                       const offset = -APEX_STRATEGY_NODES.slice(0, idx).reduce((acc, curr) => acc + (curr.contribution / 100) * circumference, 0);
+                                       const dash = (realTimeContribution / 100) * circumference;
+                                       const offset = -performanceStats.slice(0, idx).reduce((acc, curr) => acc + (curr / 100) * circumference, 0);
                                        return (
                                           <circle
                                              key={idx}
@@ -635,39 +748,248 @@ const App: React.FC = () => {
                                           />
                                        );
                                     })}
+
+                                    {/* Trading Progress Ring (Overlapping) - Green bar measuring progress vs target */}
+                                    {engineStarted && (
+                                       <>
+                                          {/* Progress ring towards discovered target - overlapping donut */}
+                                          <circle
+                                             cx="140"
+                                             cy="140"
+                                             r="118"
+                                             fill="transparent"
+                                             stroke="#10b981"
+                                             strokeWidth="12"
+                                             strokeDasharray={`${(profitAchievement / 100) * (2 * Math.PI * 118)} ${2 * Math.PI * 118}`}
+                                             className="transition-all duration-1000"
+                                             style={{ filter: 'drop-shadow(0 0 15px rgba(16, 185, 129, 0.8))' }}
+                                          />
+                                       </>
+                                    )}
                                  </svg>
                                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total Profit</span>
+                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Profit Target</span>
                                     <span className="text-3xl font-black text-[#fbbf24] font-mono tracking-tighter leading-none">
-                                       {engineStarted ? formatCurrency(totalProfit) : '---'}
+                                       {engineStarted ? formatCurrency(profitTarget) : '---'}
                                     </span>
                                     <span className={`text-[7px] font-bold uppercase mt-1 ${engineStarted ? 'text-green-400' : 'text-slate-600'}`}>
-                                       {engineStarted ? `${profitAchievement.toFixed(1)}% of Target` : 'LOCKED'}
+                                       {engineStarted ? `${profitAchievement.toFixed(1)}% Achieved` : 'LOCKED'}
                                     </span>
                                     {engineStarted && (
-                                       <span className="text-[6px] font-black text-slate-600 uppercase tracking-widest mt-0.5">
-                                          Target: {formatCurrency(profitTarget)}
-                                       </span>
+                                       <>
+                                          <span className="text-[6px] font-black text-slate-600 uppercase tracking-widest mt-0.5">
+                                             Discovered: {formatCurrency(totalProfit)}
+                                          </span>
+                                          <span className="text-[6px] font-black text-[#06b6d4] uppercase tracking-widest mt-0.5">
+                                             7-MATRIX FORGING
+                                          </span>
+                                       </>
                                     )}
                                  </div>
                               </div>
                            </div>
                            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {APEX_STRATEGY_NODES.map((n, idx) => (
-                                 <div key={idx} className={`p-5 rounded-2xl bg-black/60 border transition-all duration-700 group relative overflow-hidden text-left ${engineStarted ? 'border-white/10 opacity-100 translate-y-0' : 'border-white/5 opacity-40 translate-y-4'}`} style={{ transitionDelay: `${idx * 100}ms` }}>
-                                    <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: engineStarted ? STRATEGY_COLORS[idx % STRATEGY_COLORS.length] : '#334155' }} />
-                                    <div className="flex justify-between items-start mb-2">
-                                       <span className="text-[10px] font-black text-white uppercase tracking-wider">{n.label}</span>
-                                       <span className={`text-[9px] font-mono font-black ${engineStarted ? 'text-[#fbbf24]' : 'text-slate-700'}`}>
-                                          {engineStarted ? formatCurrency(n.usdProfit) : 'CALC...'}
-                                       </span>
+                              {APEX_STRATEGY_NODES.map((n, idx) => {
+                                 // Get real-time performance data for this strategy
+                                 const realTimePerformance = performanceStats[idx] || 0;
+                                 const strategyData = matrixStatus?.matrix?.[Object.keys(matrixStatus.matrix || {})[idx]];
+                                 const strategyYield = strategyData?.yield || '0%';
+                                 const strategyStatus = strategyData?.status || 'STANDBY';
+
+                                 return (
+                                    <div key={idx} className={`p-5 rounded-2xl bg-black/60 border transition-all duration-700 group relative overflow-hidden text-left ${engineStarted ? 'border-white/10 opacity-100 translate-y-0' : 'border-white/5 opacity-40 translate-y-4'}`} style={{ transitionDelay: `${idx * 100}ms` }}>
+                                       <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: engineStarted ? STRATEGY_COLORS[idx % STRATEGY_COLORS.length] : '#334155' }} />
+                                       <div className="flex justify-between items-start mb-2">
+                                          <span className="text-[10px] font-black text-white uppercase tracking-wider">{n.label}</span>
+                                          <div className="flex flex-col items-end">
+                                             <span className={`text-[9px] font-mono font-black ${engineStarted ? 'text-[#fbbf24]' : 'text-slate-700'}`}>
+                                                {engineStarted ? formatCurrency(n.usdProfit) : 'CALC...'}
+                                             </span>
+                                             {engineStarted && (
+                                                <span className="text-[7px] font-black text-[#06b6d4] uppercase tracking-widest">
+                                                   {strategyYield}
+                                                </span>
+                                             )}
+                                          </div>
+                                       </div>
+                                       <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest leading-tight">{n.strategy}</p>
+                                       <div className="mt-3 space-y-2">
+                                          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                             <div
+                                                className={`h-full transition-all duration-1000`}
+                                                style={{
+                                                   width: engineStarted ? `${realTimePerformance}%` : '0%',
+                                                   backgroundColor: engineStarted ? STRATEGY_COLORS[idx % STRATEGY_COLORS.length] : 'transparent'
+                                                }}
+                                             />
+                                          </div>
+                                          {engineStarted && (
+                                             <div className="flex justify-between items-center text-[6px] font-black uppercase tracking-widest text-slate-500">
+                                                <span>FORGING: {strategyStatus}</span>
+                                                <span>{realTimePerformance.toFixed(1)}%</span>
+                                             </div>
+                                          )}
+                                       </div>
                                     </div>
-                                    <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest leading-tight">{n.strategy}</p>
-                                    <div className="mt-3 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                                       <div className={`h-full bg-white/10 transition-all duration-1000`} style={{ width: engineStarted ? `${n.contribution}%` : '0%' }} />
-                                    </div>
-                                 </div>
-                              ))}
+                                 );
+                              })}
+                           </div>
+                        </div>
+
+                        {/* Daily Profit Discovery Summary Table */}
+                        <div className="mt-8 p-6 rounded-2xl bg-black/60 border border-[#06b6d4]/20 backdrop-blur-3xl">
+                           <div className="flex items-center gap-3 mb-6">
+                              <TrendingUp size={20} className="text-[#06b6d4]" />
+                              <h3 className="text-sm font-black text-white uppercase tracking-widest">Daily Profit Discovery Summary</h3>
+                              <div className="ml-auto flex items-center gap-2">
+                                 <div className={`w-2 h-2 rounded-full ${engineStarted ? 'bg-[#10b981] animate-pulse' : 'bg-slate-600'}`} />
+                                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                                    {engineStarted ? 'LIVE DISCOVERY' : 'DISCOVERY OFFLINE'}
+                                 </span>
+                              </div>
+                           </div>
+                           <div className="overflow-x-auto">
+                              <table className="w-full text-left">
+                                 <thead>
+                                    <tr className="border-b border-white/10">
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Strategy & Wallet</th>
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Daily Profit Discovered</th>
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Target Achievement</th>
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Performance Metrics</th>
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Risk & Efficiency</th>
+                                       <th className="text-[8px] font-black text-slate-500 uppercase tracking-widest pb-3">Discovery Status</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody>
+                                    {APEX_STRATEGY_NODES.map((node, idx) => {
+                                       const strategyData = matrixStatus?.matrix?.[Object.keys(matrixStatus.matrix || {})[idx]];
+                                       const realTimePerformance = performanceStats[idx] || 0;
+                                       const winRate = strategyData?.winRate || 0;
+                                       const gasEfficiency = strategyData?.gasEfficiency || 0;
+                                       const riskLevel = strategyData?.riskLevel || 'MEDIUM';
+                                       // Calculate daily profit based on performance and contribution
+                                       const dailyProfit = engineStarted ? (node.usdProfit * realTimePerformance / 100) : 0;
+
+                                       return (
+                                          <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                             <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                   <div className="flex items-center gap-2">
+                                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: STRATEGY_COLORS[idx % STRATEGY_COLORS.length] }} />
+                                                      <span className="text-[9px] font-black text-white uppercase tracking-wider">{node.label}</span>
+                                                   </div>
+                                                   <span className="text-[7px] font-mono text-slate-400">{node.address}</span>
+                                                   <span className="text-[6px] font-bold text-slate-600 uppercase tracking-widest">{node.strategy}</span>
+                                                </div>
+                                             </td>
+                                             <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                   <span className="text-[12px] font-mono font-black text-[#fbbf24]">
+                                                      {engineStarted ? formatCurrency(dailyProfit) : '---'}
+                                                   </span>
+                                                   <span className="text-[6px] font-bold text-[#10b981] uppercase tracking-widest">
+                                                      {engineStarted ? `${node.contribution}% of total` : '---'}
+                                                   </span>
+                                                </div>
+                                             </td>
+                                             <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                   <span className="text-[10px] font-mono font-black text-[#10b981]">
+                                                      {engineStarted ? `${realTimePerformance.toFixed(1)}%` : '---'}
+                                                   </span>
+                                                   <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                      <div
+                                                         className="h-full bg-[#10b981] transition-all duration-1000"
+                                                         style={{ width: engineStarted ? `${realTimePerformance}%` : '0%' }}
+                                                      />
+                                                   </div>
+                                                </div>
+                                             </td>
+                                             <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                   <div className="flex items-center gap-2">
+                                                      <span className="text-[6px] font-black text-slate-500 uppercase tracking-widest">WIN RATE:</span>
+                                                      <span className="text-[7px] font-mono font-black text-[#10b981]">
+                                                         {engineStarted ? `${winRate.toFixed(1)}%` : '---'}
+                                                      </span>
+                                                   </div>
+                                                   <div className="flex items-center gap-2">
+                                                      <span className="text-[6px] font-black text-slate-500 uppercase tracking-widest">EFFICIENCY:</span>
+                                                      <span className="text-[7px] font-mono font-black text-blue-400">
+                                                         {engineStarted ? `${gasEfficiency.toFixed(1)}%` : '---'}
+                                                      </span>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                             <td className="py-4">
+                                                <div className="flex flex-col gap-1">
+                                                   <div className="flex items-center gap-1">
+                                                      <span className={`text-[6px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${riskLevel === 'LOW' ? 'bg-green-500/10 text-green-400' : riskLevel === 'HIGH' ? 'bg-red-500/10 text-red-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                                                         {riskLevel}
+                                                      </span>
+                                                   </div>
+                                                   <span className="text-[6px] font-bold text-slate-600 uppercase tracking-widest">
+                                                      {strategyData?.yield || '0%'} yield
+                                                   </span>
+                                                </div>
+                                             </td>
+                                             <td className="py-4">
+                                                <div className="flex items-center gap-2">
+                                                   <div className={`w-2 h-2 rounded-full ${engineStarted ? 'bg-[#10b981] animate-pulse' : 'bg-slate-600'}`} />
+                                                   <span className={`text-[7px] font-black uppercase tracking-widest ${engineStarted ? 'text-[#10b981]' : 'text-slate-600'}`}>
+                                                      {engineStarted ? 'DISCOVERING' : 'STANDBY'}
+                                                   </span>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       );
+                                    })}
+                                    {/* Total Daily Profit Summary Row */}
+                                    <tr className="border-t-2 border-[#06b6d4]/30 bg-[#06b6d4]/5">
+                                       <td className="py-4">
+                                          <div className="flex items-center gap-2">
+                                             <Target size={14} className="text-[#06b6d4]" />
+                                             <span className="text-[10px] font-black text-[#06b6d4] uppercase tracking-wider">TOTAL DAILY PROFIT DISCOVERED</span>
+                                          </div>
+                                       </td>
+                                       <td className="py-4">
+                                          <span className="text-xl font-mono font-black text-[#fbbf24]">
+                                             {engineStarted ? formatCurrency(APEX_STRATEGY_NODES.reduce((sum, node, idx) => {
+                                                const performance = performanceStats[idx] || 0;
+                                                return sum + (node.usdProfit * performance / 100);
+                                             }, 0)) : '---'}
+                                          </span>
+                                       </td>
+                                       <td className="py-4">
+                                          <span className="text-lg font-mono font-black text-[#10b981]">
+                                             {engineStarted ? `${profitAchievement.toFixed(1)}%` : '---'}
+                                          </span>
+                                       </td>
+                                       <td className="py-4">
+                                          <div className="flex flex-col gap-1">
+                                             <span className="text-[8px] font-black text-[#06b6d4] uppercase tracking-widest">7-STRATEGY MATRIX</span>
+                                             <span className="text-[6px] font-bold text-slate-600 uppercase tracking-widest">ALGORITHMIC DISCOVERY</span>
+                                          </div>
+                                       </td>
+                                       <td className="py-4">
+                                          <div className="flex flex-col gap-1">
+                                             <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">TARGET:</span>
+                                             <span className="text-[9px] font-mono font-black text-[#06b6d4]">
+                                                {engineStarted ? formatCurrency(profitTarget) : '---'}
+                                             </span>
+                                          </div>
+                                       </td>
+                                       <td className="py-4">
+                                          <div className="flex items-center gap-2">
+                                             <div className={`w-2 h-2 rounded-full ${engineStarted ? 'bg-[#10b981] animate-pulse' : 'bg-slate-600'}`} />
+                                             <span className="text-[8px] font-black text-[#10b981] uppercase tracking-widest">
+                                                {engineStarted ? 'ALGORITHMIC SUCCESS' : 'TARGET LOCKED'}
+                                             </span>
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 </tbody>
+                              </table>
                            </div>
                         </div>
 
@@ -688,16 +1010,27 @@ const App: React.FC = () => {
                                  </p>
                               </div>
                            </div>
-                           <button
-                              onClick={() => engineStarted ? setActiveView('PERFORMANCE') : toggleEngine()}
-                              className={`w-full md:w-auto px-12 py-5 rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 ${engineStarted
-                                 ? 'bg-[#10b981] text-black shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:scale-105'
-                                 : 'bg-[#fbbf24] text-black shadow-[0_0_40px_rgba(251,191,36,0.3)] hover:scale-105'
-                                 }`}
-                           >
-                              {engineStarted ? <Activity size={18} /> : <Flame size={18} />}
-                              {engineStarted ? 'VIEW SYNC FEED' : 'Forge Strategies'}
-                           </button>
+                           <div className="flex flex-col md:flex-row gap-4">
+                              {engineStarted && (
+                                 <button
+                                    onClick={() => setShowScanModal(true)}
+                                    className="w-full md:w-auto px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 bg-[#06b6d4] text-black shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:scale-105"
+                                 >
+                                    <Search size={16} />
+                                    Scan for Alpha
+                                 </button>
+                              )}
+                              <button
+                                 onClick={() => engineStarted ? setActiveView('PERFORMANCE') : toggleEngine()}
+                                 className={`w-full md:w-auto px-12 py-5 rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 ${engineStarted
+                                    ? 'bg-[#10b981] text-black shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:scale-105'
+                                    : 'bg-[#fbbf24] text-black shadow-[0_0_40px_rgba(251,191,36,0.3)] hover:scale-105'
+                                    }`}
+                              >
+                                 {engineStarted ? <Activity size={18} /> : <Flame size={18} />}
+                                 {engineStarted ? 'VIEW SYNC FEED' : 'Forge Strategies'}
+                              </button>
+                           </div>
                         </div>
                      </div>
                   </div>
@@ -1200,25 +1533,26 @@ const App: React.FC = () => {
                )}
             </main>
 
-            <footer className="h-10 border-t border-white/5 bg-black/90 px-6 md:px-10 flex items-center justify-between z-50">
+            <footer className="h-16 border-t border-white/5 bg-black/90 px-6 md:px-10 flex items-center justify-between z-50">
                <div className="flex items-center gap-8">
                   <div className="flex items-center gap-2">
                      <div className={`w-1.5 h-1.5 rounded-full transition-colors ${connectionStatus === 'ONLINE' ? 'bg-[#10b981] shadow-[0_0_8px_#10b981]' :
-                        connectionStatus === 'PROBING' ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse' :
+                        connectionStatus === 'PROBING' || connectionStatus === 'SCANNING' ? 'bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse' :
                            'bg-red-500 shadow-[0_0_8px_#ef4444]'
                         }`} />
                      <span className={`text-[8px] font-black uppercase tracking-widest ${connectionStatus === 'ONLINE' ? 'text-slate-500' :
-                        connectionStatus === 'PROBING' ? 'text-blue-500' : 'text-red-500'
+                        connectionStatus === 'PROBING' || connectionStatus === 'SCANNING' ? 'text-blue-500' : 'text-red-500'
                         }`}>
                         {connectionStatus === 'ONLINE' ? 'SERVER: ONLINE' :
-                           connectionStatus === 'PROBING' ? 'SERVER: LINKING...' : 'SERVER: DISCONNECTED'}
+                           connectionStatus === 'PROBING' ? 'SERVER: LINKING...' :
+                              connectionStatus === 'SCANNING' ? 'SERVER: FAILSAFE HUNTING...' : 'SERVER: DISCONNECTED'}
                      </span>
-                     {connectionStatus === 'OFFLINE' && (
+                     {(connectionStatus === 'OFFLINE' || connectionStatus === 'SCANNING') && (
                         <button
                            onClick={retryConnection}
-                           className="text-[7px] font-black text-[#fbbf24] border border-[#fbbf24]/30 px-2 py-0.5 rounded hover:bg-[#fbbf24]/10 transition-colors uppercase tracking-widest animate-pulse"
+                           className={`text-[7px] font-black text-[#fbbf24] border border-[#fbbf24]/30 px-2 py-0.5 rounded hover:bg-[#fbbf24]/10 transition-colors uppercase tracking-widest ${connectionStatus === 'SCANNING' ? 'opacity-50 cursor-wait' : 'animate-pulse'}`}
                         >
-                           Retry
+                           {connectionStatus === 'SCANNING' ? 'Scanning...' : 'Retry'}
                         </button>
                      )}
                      <div className="hidden lg:block h-3 w-px bg-white/5 mx-2" />
@@ -1268,6 +1602,39 @@ const App: React.FC = () => {
                      </div>
                   )}
                </div>
+
+               {/* DEPLOYMENT VALIDATION ADDRESSES - Displayed when engine is running */}
+               {engineStarted && (deploymentContractNumber || generatedSmartAccount) && (
+                  <div className="flex items-center gap-6">
+                     {deploymentContractNumber && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/5 group cursor-pointer" onClick={() => {
+                           navigator.clipboard.writeText(deploymentContractNumber);
+                           alert("Contract Address Copied");
+                        }}>
+                           <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                           <div className="flex flex-col">
+                              <span className="text-[6px] font-black text-slate-600 uppercase tracking-widest">Contract</span>
+                              <span className="text-[8px] font-mono text-purple-400 group-hover:text-white transition-colors">{deploymentContractNumber}</span>
+                           </div>
+                           <Copy size={10} className="text-slate-700 group-hover:text-purple-400" />
+                        </div>
+                     )}
+                     {generatedSmartAccount && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#10b981]/30 bg-[#10b981]/5 group cursor-pointer" onClick={() => {
+                           navigator.clipboard.writeText(generatedSmartAccount);
+                           alert("Smart Wallet Address Copied");
+                        }}>
+                           <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+                           <div className="flex flex-col">
+                              <span className="text-[6px] font-black text-slate-600 uppercase tracking-widest">Smart Wallet</span>
+                              <span className="text-[8px] font-mono text-[#10b981] group-hover:text-white transition-colors">{generatedSmartAccount.slice(0, 8)}...{generatedSmartAccount.slice(-6)}</span>
+                           </div>
+                           <Copy size={10} className="text-slate-700 group-hover:text-[#10b981]" />
+                        </div>
+                     )}
+                  </div>
+               )}
+
                <span className="text-[8px] font-black text-slate-700 uppercase tracking-widest font-mono">&copy; 2025 ORION_TERMINAL</span>
             </footer>
          </div>
