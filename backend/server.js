@@ -164,28 +164,93 @@ app.post('/api/strategies/analyze', async (req, res) => {
 });
 
 // NEW: 7-Node Strategy Matrix Live Status
+// NEW: 7-Node Strategy Matrix - "The Profit Forge" Algorithm
 app.get('/api/matrix/status', async (req, res) => {
   try {
-    const gasPrice = await blockchainService.getGasPrice();
+    const gasPriceData = await blockchainService.getGasPrice();
     const networkStatus = await blockchainService.getStatus();
 
-    // Live Logic for "Active" Strategies based on market conditions
-    const gas = parseInt(gasPrice?.gasPrice || '0');
+    // 1. Extract Real-Time Network Variables
+    const gasGwei = parseInt(gasPriceData?.gasPrice || '0') / 1e9; // Convert to Gwei
+    const blockNum = networkStatus.blockNumber || Date.now();
 
-    const matrixStatus = {
-      "THE GHOST": { status: gas > 50000000000 ? 'ACTIVE' : 'STANDBY', yield: '4.2%' }, // Active if congestion > 50 gwei (Flashbots needed)
-      "SLOT-0 SNIPER": { status: 'ACTIVE', yield: '12.5%' }, // Always active on reliable block times
-      "BUNDLE MASTER": { status: networkStatus.blockNumber % 2 === 0 ? 'CALCULATING' : 'READY', yield: '8.1%' },
-      "ATOMIC FLUX": { status: 'ACTIVE', yield: '3.4%' },
-      "DARK RELAY": { status: 'STANDBY', yield: '0.0%' },
-      "HIVE SYMMETRY": { status: 'ACTIVE', yield: '15.2%' },
-      "DISCOVERY HUNT": { status: 'SCANNING', yield: 'Dynamic' }
+    // 2. Synthesize "Market Volatility" (Simulated based on block dynamics)
+    // In a full node, this would come from "mempool pending tx count"
+    const volatilityIndex = (blockNum % 100) / 100; // 0.00 - 0.99
+
+    // 3. "The Profit Forge" Weighted Scoring System
+    // Each strategy has a unique 'activation formula' based on network conditions
+
+    const calculateScore = (strategyName) => {
+      switch (strategyName) {
+        case "THE GHOST":
+          // Thrives in HIGH gas (congestion) + HIGH volatility (MEV opportunities)
+          return (gasGwei > 40 ? 0.8 : 0.2) + (volatilityIndex * 0.5);
+
+        case "SLOT-0 SNIPER":
+          // Requires STABLE blocks + LOW volatility
+          return (volatilityIndex < 0.3 ? 0.9 : 0.4);
+
+        case "BUNDLE MASTER":
+          // Atomic grouping needs Moderate Gas
+          return (gasGwei > 15 && gasGwei < 50 ? 0.85 : 0.3);
+
+        case "ATOMIC FLUX":
+          // Pure arbitrage: Needs HIGH volatility (price dislocation)
+          return volatilityIndex > 0.6 ? 0.95 : 0.4;
+
+        case "DARK RELAY":
+          // Liquidity sniping: Rare events (Low probability base)
+          return (blockNum % 13 === 0 ? 0.9 : 0.1);
+
+        case "HIVE SYMMETRY":
+          // Copy-trading: Always moderately viable
+          return 0.65;
+
+        case "DISCOVERY HUNT":
+          // Alpha searching: Inverse to congestion (needs cheap gas to scan)
+          return (gasGwei < 20 ? 0.9 : 0.2);
+
+        default: return 0.5;
+      }
     };
+
+    // 4. Forge Matrix Status
+    const matrixStatus = {};
+    const strategies = [
+      "THE GHOST", "SLOT-0 SNIPER", "BUNDLE MASTER", "ATOMIC FLUX",
+      "DARK RELAY", "HIVE SYMMETRY", "DISCOVERY HUNT"
+    ];
+
+    strategies.forEach(strat => {
+      const score = calculateScore(strat);
+      let status = 'STANDBY';
+      let yieldRate = 0;
+
+      if (score > 0.8) status = 'ACTIVE';
+      else if (score > 0.5) status = 'SCANNING';
+
+      // Dynamic Yield Calculation based on Score
+      // Higher score = Higher theoretical yield at this exact second
+      if (status !== 'STANDBY') {
+        yieldRate = (score * 12.5 * (1 + volatilityIndex)).toFixed(2); // Max ~25%
+      }
+
+      matrixStatus[strat] = {
+        status,
+        yield: `${yieldRate}%`,
+        score: score.toFixed(2)
+      };
+    });
 
     res.json({
       timestamp: new Date(),
-      network: networkStatus,
-      gasMetrics: gasPrice,
+      network: {
+        ...networkStatus,
+        volatilityIndex: volatilityIndex.toFixed(2),
+        congestion: gasGwei > 50 ? 'HIGH' : 'NORMAL'
+      },
+      gasMetrics: gasPriceData,
       matrix: matrixStatus
     });
   } catch (error) {
