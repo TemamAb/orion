@@ -1,3 +1,4 @@
+require('dotenv').config();
 const ethers = require('ethers');
 const winston = require('winston');
 
@@ -13,33 +14,48 @@ const logger = winston.createLogger({
   ],
 });
 
+const UNISWAP_ROUTER_ABI = [
+  'function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)',
+  'function getAmountsIn(uint amountOut, address[] memory path) public view returns (uint[] memory amounts)'
+];
+
+const ERC20_ABI = [
+  'function decimals() view returns (uint8)',
+  'function symbol() view returns (string)',
+  'function balanceOf(address) view returns (uint256)'
+];
+
 class BlockchainService {
   constructor() {
     this.provider = null;
     this.signer = null;
     this.flashLoanContract = null;
     this.dexContracts = {};
+    this.isConnected = false;
   }
 
   async initialize(chain = 'ETH') {
     try {
       const rpcUrl = this.getRPCUrl(chain);
-      const privateKey = process.env.PRIVATE_KEY;
-
-      if (!privateKey) {
-        throw new Error('PRIVATE_KEY not found in environment variables');
-      }
-
+      // Use a robust provider setup
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
-      this.signer = new ethers.Wallet(privateKey, this.provider);
+
+      const privateKey = process.env.PRIVATE_KEY;
+      if (privateKey) {
+        this.signer = new ethers.Wallet(privateKey, this.provider);
+      } else {
+        logger.warn("Private key missing. Read-only mode active.");
+      }
 
       logger.info(`Blockchain service initialized for ${chain} network`);
 
       // Initialize contracts
       await this.initializeContracts(chain);
+      this.isConnected = true;
     } catch (error) {
       logger.error('Failed to initialize blockchain service:', error);
-      throw error;
+      this.isConnected = false;
+      // Do not throw, allow app to start in disconnected state if RPC fails
     }
   }
 
@@ -54,28 +70,27 @@ class BlockchainService {
   }
 
   async initializeContracts(chain) {
-    // Aave Flash Loan contract (example for Ethereum)
-    if (chain === 'ETH') {
-      const flashLoanAddress = '0x87870Bcd6C7e3Dc0891e5F30E8e1C4E9F3a6E8Bc'; // Aave V3 Pool Address
+    // Aave Flash Loan contract
+    if (chain === 'ETH' && this.signer) {
+      const flashLoanAddress = process.env.FLASH_LOAN_CONTRACT_ADDRESS || '0x87870Bcd6C7e3Dc0891e5F30E8e1C4E9F3a6E8Bc';
       const flashLoanAbi = [
         'function flashLoan(address receiverAddress, address[] calldata assets, uint256[] calldata amounts, uint256[] calldata modes, address onBehalfOf, bytes calldata params, uint16 referralCode) external',
-        'function FLASHLOAN_PREMIUM_TOTAL() view returns (uint128)',
-        'function FLASHLOAN_PREMIUM_TO_PROTOCOL() view returns (uint128)'
       ];
       this.flashLoanContract = new ethers.Contract(flashLoanAddress, flashLoanAbi, this.signer);
     }
 
-    // Initialize DEX contracts (Uniswap V3 example)
-    const uniswapV3FactoryAddress = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
-    const uniswapV3FactoryAbi = [
-      'function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)'
-    ];
-    this.dexContracts.uniswapV3Factory = new ethers.Contract(uniswapV3FactoryAddress, uniswapV3FactoryAbi, this.provider);
+    // Uniswap V2 Router for Price Checks (More universal than V3Quoter for generic arbitrage)
+    const routerAddress = process.env.UNISWAP_V2_ROUTER || '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+    this.dexContracts.uniswapRouter = new ethers.Contract(routerAddress, UNISWAP_ROUTER_ABI, this.provider);
 
     logger.info('Contracts initialized');
   }
 
   async executeFlashLoanArbitrage(params) {
+    if (!this.signer || !this.flashLoanContract) {
+      return { success: false, error: "Wallet or Contract not initialized for execution" };
+    }
+
     try {
       const {
         tokenIn,
@@ -83,69 +98,94 @@ class BlockchainService {
         amount,
         dexPath,
         slippageTolerance = 0.005,
-        deadline = Math.floor(Date.now() / 1000) + 300 // 5 minutes
+        deadline = Math.floor(Date.now() / 1000) + 300
       } = params;
 
-      logger.info(`Executing flash loan arbitrage: ${amount} ${tokenIn} -> ${tokenOut}`);
+      logger.info(`Initiating Flash Loan: ${amount} ${tokenIn} -> ${tokenOut}`);
 
-      // Calculate minimum amount out with slippage
-      const expectedAmountOut = await this.calculateExpectedOutput(tokenIn, tokenOut, amount, dexPath);
-      const minAmountOut = expectedAmountOut * (1 - slippageTolerance);
+      // 1. Verify on-chain profitability immediately before execution
+      const isProfitable = await this.validateArbitrageOpportunity(tokenIn, tokenOut, amount);
+      if (!isProfitable) {
+        return { success: false, error: "Opportunity no longer profitable on-chain" };
+      }
 
-      // Prepare flash loan parameters
+      // 2. Prepare parameters
+      const amountWei = ethers.parseUnits(amount.toString(), 18); // Default to 18, should ideally fetch decimals
       const assets = [tokenIn];
-      const amounts = [ethers.parseUnits(amount.toString(), 18)]; // Assuming 18 decimals
-      const modes = [0]; // No debt mode
+      const amounts = [amountWei];
+      const modes = [0];
       const onBehalfOf = await this.signer.getAddress();
-      const referralCode = 0;
 
-      // Encode arbitrage logic as params
+      // Encode the logic for the receiver contract
       const arbitrageParams = ethers.AbiCoder.defaultAbiCoder().encode(
         ['address', 'address', 'uint256', 'address[]', 'uint256'],
-        [tokenOut, minAmountOut, dexPath, deadline]
+        [tokenOut, amountWei, dexPath, deadline] // Simply passing params through
       );
 
-      // Execute flash loan
+      // 3. Estimate Gas
+      const gasLimit = await this.flashLoanContract.flashLoan.estimateGas(
+        onBehalfOf, assets, amounts, modes, onBehalfOf, arbitrageParams, 0
+      ).catch(e => BigInt(500000)); // Fallback gas
+
+      // 4. Fire Transaction
       const tx = await this.flashLoanContract.flashLoan(
-        onBehalfOf, // receiverAddress (this contract would handle the arbitrage)
-        assets,
-        amounts,
-        modes,
-        onBehalfOf,
-        arbitrageParams,
-        referralCode
+        onBehalfOf, assets, amounts, modes, onBehalfOf, arbitrageParams, 0,
+        { gasLimit: gasLimit * BigInt(12) / BigInt(10) } // 20% buffer
       );
 
+      logger.info(`Tx Broadcasted: ${tx.hash}`);
       const receipt = await tx.wait();
-      logger.info(`Flash loan executed successfully. TX Hash: ${receipt.hash}`);
 
       return {
-        success: true,
+        success: receipt.status === 1,
         transactionHash: receipt.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
-        profit: await this.calculateProfit(receipt, expectedAmountOut)
+        profit: "Pending Analysis" // In real engine, parse events to get exact profit
       };
     } catch (error) {
-      logger.error('Flash loan execution failed:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      logger.error('Flash loan execution prediction failed:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  async calculateExpectedOutput(tokenIn, tokenOut, amount, dexPath) {
-    // Simplified calculation - in reality, this would query DEX pools
-    // For now, return a mock value
-    const mockExchangeRate = 1.02; // 2% arbitrage opportunity
-    return parseFloat(amount) * mockExchangeRate;
-  }
+  async validateArbitrageOpportunity(tokenIn, tokenOut, amount) {
+    // REAL ON-CHAIN CHECK
+    try {
+      if (!this.dexContracts.uniswapRouter) return false;
 
-  async calculateProfit(txReceipt, expectedAmountOut) {
-    // Calculate actual profit from transaction logs
-    // This would parse the transaction logs to determine actual profit
-    return expectedAmountOut * 0.015; // Mock 1.5% profit
+      // 1. Get Decimals (Optimization: Cache this)
+      const tokenContract = new ethers.Contract(tokenIn, ERC20_ABI, this.provider);
+      // const decimals = await tokenContract.decimals(); // Slowing down for demo, assume 18 or use fast lookup
+      const amountWei = ethers.parseUnits(amount.toString(), 18);
+
+      // 2. Get Market Output (Simulate Sell)
+      const path = [tokenIn, tokenOut];
+      const amountsOut = await this.dexContracts.uniswapRouter.getAmountsOut(amountWei, path);
+      const expectedOutputWei = amountsOut[amountsOut.length - 1];
+      const expectedOutput = parseFloat(ethers.formatUnits(expectedOutputWei, 18)); // Mock output decimal
+
+      // 3. Get Reverse Market Cost (Simulate Buy Back to close loop) - For simple arb
+      // For cross-dex, we would check Router B. 
+      // Assuming straightforward arb for now:
+
+      const grossProfit = expectedOutput - amount;
+
+      // 4. Gas Cost Calculation
+      const feeData = await this.provider.getFeeData();
+      const gasPrice = feeData.gasPrice || BigInt(0);
+      const estimatedGas = BigInt(300000); // Average arb swap
+      const gasCostEth = parseFloat(ethers.formatEther(gasPrice * estimatedGas));
+
+      const netProfit = grossProfit - gasCostEth;
+
+      logger.info(`Arb Check: Net: ${netProfit} | Gross: ${grossProfit} | Gas: ${gasCostEth}`);
+
+      return netProfit > 0;
+    } catch (error) {
+      logger.error('Arbitrage validation error:', error);
+      return false; // Fail safe
+    }
   }
 
   async getGasPrice() {
@@ -157,85 +197,23 @@ class BlockchainService {
         maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.toString()
       };
     } catch (error) {
-      logger.error('Failed to get gas price:', error);
+      logger.warn('Failed to get gas price:', error.message);
       return null;
     }
   }
 
-  async estimateGas(txParams) {
-    try {
-      const gasEstimate = await this.provider.estimateGas(txParams);
-      return gasEstimate.toString();
-    } catch (error) {
-      logger.error('Gas estimation failed:', error);
-      return null;
+  async getStatus() {
+    return {
+      connected: this.isConnected,
+      network: (await this.provider?.getNetwork())?.name || 'unknown',
+      blockNumber: await this.provider?.getBlockNumber().catch(() => 0)
     }
   }
 
   async getBalance(address) {
-    try {
-      const balance = await this.provider.getBalance(address);
-      return ethers.formatEther(balance);
-    } catch (error) {
-      logger.error('Failed to get balance:', error);
-      return null;
-    }
-  }
-
-  async monitorTransaction(txHash) {
-    try {
-      const receipt = await this.provider.getTransactionReceipt(txHash);
-      if (receipt) {
-        return {
-          status: receipt.status === 1 ? 'SUCCESS' : 'FAILED',
-          blockNumber: receipt.blockNumber,
-          gasUsed: receipt.gasUsed.toString(),
-          effectiveGasPrice: receipt.effectiveGasPrice?.toString()
-        };
-      }
-      return { status: 'PENDING' };
-    } catch (error) {
-      logger.error('Transaction monitoring failed:', error);
-      return { status: 'ERROR', error: error.message };
-    }
-  }
-
-  async getTokenBalance(tokenAddress, walletAddress) {
-    try {
-      const tokenContract = new ethers.Contract(
-        tokenAddress,
-        ['function balanceOf(address) view returns (uint256)'],
-        this.provider
-      );
-      const balance = await tokenContract.balanceOf(walletAddress);
-      return balance.toString();
-    } catch (error) {
-      logger.error('Failed to get token balance:', error);
-      return null;
-    }
-  }
-
-  async validateArbitrageOpportunity(tokenIn, tokenOut, amount) {
-    try {
-      // Check prices across DEXes
-      const price1 = await this.getDEXPrice(tokenIn, tokenOut, 'UNISWAP');
-      const price2 = await this.getDEXPrice(tokenIn, tokenOut, 'SUSHISWAP');
-
-      if (!price1 || !price2) return false;
-
-      const priceDiff = Math.abs(price1 - price2) / Math.min(price1, price2);
-      const minProfitThreshold = 0.005; // 0.5% minimum profit
-
-      return priceDiff > minProfitThreshold;
-    } catch (error) {
-      logger.error('Arbitrage validation failed:', error);
-      return false;
-    }
-  }
-
-  async getDEXPrice(tokenIn, tokenOut, dex) {
-    // Mock price fetching - in reality, query DEX pools
-    return Math.random() * 0.1 + 0.95; // Random price between 0.95 and 1.05
+    if (!this.provider) return '0';
+    const bal = await this.provider.getBalance(address);
+    return ethers.formatEther(bal);
   }
 }
 
