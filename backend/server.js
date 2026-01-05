@@ -5,8 +5,9 @@ const helmet = require('helmet');
 const mongoose = require('mongoose');
 const redis = require('redis');
 const winston = require('winston');
-const aiService = require('./aiService');
 const blockchainService = require('./blockchain');
+const aiService = require('./aiService');
+const botOrchestrator = require('./botOrchestrator');
 const Strategy = require('./models/Strategy');
 const Trade = require('./models/Trade');
 const {
@@ -285,6 +286,17 @@ app.get('/api/matrix/status', async (req, res) => {
   }
 });
 
+// Bot Orchestrator Monitoring Route
+app.get('/api/bots/status', async (req, res) => {
+  try {
+    const status = botOrchestrator.getSystemStatus();
+    res.json(status);
+  } catch (error) {
+    logger.error('Bot status check error:', error);
+    res.status(500).json({ error: 'Failed to fetch bot swarm status' });
+  }
+});
+
 // Trade routes
 app.get('/api/trades', validateInput, async (req, res) => {
   try {
@@ -367,6 +379,9 @@ async function initializeServices() {
     await blockchainService.initialize();
     blockchainService.isConnected = true;
     logger.info('Blockchain service initialized successfully');
+
+    // Activate Tri-Tier Bot System
+    botOrchestrator.start();
   } catch (error) {
     logger.warn('Blockchain service initialization failed, continuing without blockchain features:', error.message);
   }
