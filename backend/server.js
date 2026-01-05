@@ -47,9 +47,16 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(helmet(securityHeaders));
 
 // Permissive CORS for initial Render deployment debugging
+// Ultimate Permissive CORS for Link Recovery
 app.use(cors({
-  origin: true, // Reflect request origin
+  origin: (origin, callback) => {
+    // Log origin for diagnostic purposes
+    if (origin) logger.info(`Incoming Request from Origin: ${origin}`);
+    callback(null, true); // Allow all origins
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));

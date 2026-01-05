@@ -134,7 +134,7 @@ const App: React.FC = () => {
    // 1. Check build-time env var
    // 2. Fallback to localhost for dev
    // 3. AUTO-DISCOVER if running on Render production
-   // Neural discovery: check localStorage override first
+   // Omni-Discovery Sentinel: Check localStorage, then neural patterns
    const [manualBackendUrl, setManualBackendUrl] = useState(localStorage.getItem('ORION_BACKEND_OVERRIDE') || '');
    let rawBackendUrl = manualBackendUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -154,36 +154,49 @@ const App: React.FC = () => {
                ? `${protocol}//${baseName}-backend-${suffix}.onrender.com`
                : `${protocol}//${baseName}-backend.onrender.com`;
          }
-         console.log(`[Orion Architecture] Neural Discovery: ${currentHost} -> ${rawBackendUrl}`);
+         console.log(`[Orion Architecture] Omni-Discovery (Alpha Pattern): ${rawBackendUrl}`);
       }
    }
 
    // Normalize URL
    const BACKEND_URL = rawBackendUrl.replace(/\/$/, "");
 
-   // Auto-Sync Sentinel
+   // Brute-Force Omni-Scan
    useEffect(() => {
       if (connectionStatus === 'OFFLINE' && !manualBackendUrl && typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-         const tryPatterns = async () => {
+         const bruteForceDiscovery = async () => {
             const currentHost = window.location.hostname;
-            const base = currentHost.split('.')[0];
             const protocol = window.location.protocol;
+            const parts = currentHost.split('.')[0].split('-');
+            const suffix = parts.length > 1 ? parts[parts.length - 1] : '';
+            const baseName = parts[0];
+
             const candidates = [
-               `${protocol}//${base}-backend.onrender.com`,
-               `${protocol}//orion-backend.onrender.com`
+               `${protocol}//${currentHost.replace(suffix, 'backend-' + suffix)}`,
+               `${protocol}//${baseName}-backend-${suffix}.onrender.com`,
+               `${protocol}//${baseName}-backend.onrender.com`,
+               `${protocol}//orion-backend.onrender.com`,
+               `${protocol}//orion-backend-${suffix}.onrender.com`
             ];
+
+            console.log("[Orion Architecture] Primary Discovery Failed. Initiating Brute-Force Omni-Scan...");
+
             for (const url of candidates) {
+               if (url === window.location.origin) continue; // Skip self
                try {
-                  const res = await fetch(`${url}/api/health`);
-                  if (res.ok) {
+                  const probe = await fetch(`${url}/api/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
+                  const isJson = probe.headers.get("content-type")?.includes("application/json");
+                  if (probe.ok && isJson) {
+                     console.log(`[Orion Architecture] Omni-Scan SUCCESS: Core found at ${url}`);
                      localStorage.setItem('ORION_BACKEND_OVERRIDE', url);
                      window.location.reload();
-                     break;
+                     return;
                   }
                } catch (e) { }
             }
+            console.error("[Orion Architecture] Omni-Scan Failed to locate Enterprise Core. Manual [SET] required.");
          };
-         tryPatterns();
+         bruteForceDiscovery();
       }
    }, [connectionStatus, manualBackendUrl]);
 
