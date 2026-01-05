@@ -6,7 +6,7 @@ const crypto = require('crypto');
 // Rate limiting configurations
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 2000, // Increased for real-time dashboard polling (Matrix, Bots, Stats)
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: 15 * 60
@@ -17,7 +17,7 @@ const apiLimiter = rateLimit({
 
 const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // limit each IP to 50 requests per windowMs
+  max: 500, // Increased for frequent strategy updates
   message: {
     error: 'Too many sensitive operations from this IP, please try again later.',
     retryAfter: 15 * 60

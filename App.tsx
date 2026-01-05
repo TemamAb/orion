@@ -297,38 +297,47 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
    }, [engineStarted, connectionStatus, BACKEND_URL]);
 
-   useEffect(() => {
-      const checkBackend = async () => {
-         // Circuit Breaker: If we are already probing, don't overlap
-         if (connectionStatus === 'PROBING' && serverStatus) return;
+   const checkBackend = async () => {
+      // Circuit Breaker: If we are already probing, don't overlap
+      if (connectionStatus === 'PROBING' && serverStatus) return;
 
-         setConnectionStatus('PROBING');
-         try {
-            const hRes = await fetch(`${BACKEND_URL}/api/health`);
+      setConnectionStatus('PROBING');
+      try {
+         const hRes = await fetch(`${BACKEND_URL}/api/health`);
 
-            if (hRes.ok) {
+         if (hRes.ok) {
+            try {
                const sRes = await fetch(`${BACKEND_URL}/api/status`);
                if (sRes.ok) {
                   const sData = await sRes.json();
                   setServerStatus(sData);
-
-                  // Neural Sync: If backend is up but has no authority, 
-                  // we are ONLINE but in SENTINEL mode.
                   console.log(`[Orion Neural Sync] Core: ONLINE | Signer: ${sData.blockchain?.signer ? 'ACTIVE' : 'SENTINEL'}`);
                }
-               setConnectionStatus('ONLINE');
-            } else {
-               setConnectionStatus('OFFLINE');
+            } catch (e) {
+               console.warn("[Orion Architecture] Health check passed but Status check failed. Likely partial boot.");
             }
-         } catch (e) {
-            console.error("[Orion Architecture] Backend Connection Interrupted:", e);
+            setConnectionStatus('ONLINE');
+         } else {
+            console.error(`[Orion Architecture] Core responded with ${hRes.status}`);
             setConnectionStatus('OFFLINE');
          }
-      };
+      } catch (e) {
+         console.error("[Orion Architecture] Backend Connection Interrupted:", e);
+         setConnectionStatus('OFFLINE');
+      }
+   };
+
+   // Manual Retry Trigger
+   const retryConnection = () => {
+      setConnectionStatus('PROBING');
+      setTimeout(checkBackend, 500);
+   };
+
+   useEffect(() => {
       checkBackend();
       const interval = setInterval(checkBackend, 30000); // Check every 30s
       return () => clearInterval(interval);
-   }, [BACKEND_URL, engineStarted]);
+   }, [BACKEND_URL]); // Removed engineStarted to avoid unnecessary resets
 
    const authorizeSession = async () => {
       try {
@@ -1143,6 +1152,18 @@ const App: React.FC = () => {
                         }`}>
                         {connectionStatus === 'ONLINE' ? 'SERVER: ONLINE' :
                            connectionStatus === 'PROBING' ? 'SERVER: LINKING...' : 'SERVER: DISCONNECTED'}
+                     </span>
+                     {connectionStatus === 'OFFLINE' && (
+                        <button
+                           onClick={retryConnection}
+                           className="text-[7px] font-black text-[#fbbf24] border border-[#fbbf24]/30 px-2 py-0.5 rounded hover:bg-[#fbbf24]/10 transition-colors uppercase tracking-widest animate-pulse"
+                        >
+                           Retry
+                        </button>
+                     )}
+                     <div className="hidden lg:block h-3 w-px bg-white/5 mx-2" />
+                     <span className="hidden lg:block text-[6px] font-mono text-slate-700 uppercase tracking-tighter truncate max-w-[150px]" title={BACKEND_URL}>
+                        Core: {BACKEND_URL}
                      </span>
                   </div>
                   <div className="flex items-center gap-2">
