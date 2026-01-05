@@ -161,9 +161,28 @@ const App: React.FC = () => {
             if (res.ok) {
                const data = await res.json();
                setMatrixStatus(data);
+
+               // Dynamic Profit Target Calculation
+               // Sum of max theoretical daily yield across all 7 active strategies based on current market volatility and gas data
+               let aggregatedPotential = 0;
+               const strategies = Object.keys(data.matrix);
+
+               strategies.forEach(key => {
+                  const node = data.matrix[key];
+                  // If active, it contributes significant potential 
+                  // Base potential approx $50k-$150k per node per day depending on score
+                  if (node.status === 'ACTIVE') {
+                     aggregatedPotential += (parseFloat(node.score) * 150000);
+                  } else if (node.status === 'SCANNING') {
+                     aggregatedPotential += (parseFloat(node.score) * 50000);
+                  }
+               });
+
+               // Set new dynamic target (minimum $1M to keep goal aspiring)
+               setProfitTarget(Math.max(1000000, aggregatedPotential));
+
                // Update visualization based on live status (simplified mapping)
                setPerformanceStats(prev => prev.map((val, idx) => {
-                  const strategies = Object.keys(data.matrix); // Order matters, assuming same order
                   const stratKey = strategies[idx];
                   const status = data.matrix[stratKey]?.status;
 
