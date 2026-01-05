@@ -112,16 +112,43 @@ const App: React.FC = () => {
    // Performance Fluctuations
    const [performanceStats, setPerformanceStats] = useState(APEX_STRATEGY_NODES.map(() => 0));
 
+   const [matrixStatus, setMatrixStatus] = useState<any>(null);
+
+   // Backend Connection Logic
+   const [backendStatus, setBackendStatus] = useState<boolean>(false);
+   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+   // Live Matrix Polling
    useEffect(() => {
-      if (!engineStarted) {
-         setPerformanceStats(APEX_STRATEGY_NODES.map(() => 0));
-         return;
-      }
-      const interval = setInterval(() => {
-         setPerformanceStats(prev => prev.map(() => 98.5 + Math.random() * 1.45));
-      }, 2000);
+      if (!engineStarted) return;
+
+      const pollMatrix = async () => {
+         try {
+            const res = await fetch(`${BACKEND_URL}/api/matrix/status`);
+            if (res.ok) {
+               const data = await res.json();
+               setMatrixStatus(data);
+               // Update visualization based on live status (simplified mapping)
+               setPerformanceStats(prev => prev.map((val, idx) => {
+                  const strategies = Object.keys(data.matrix); // Order matters, assuming same order
+                  const stratKey = strategies[idx];
+                  const status = data.matrix[stratKey]?.status;
+
+                  // Dynamic fluctuation based on LIVE status
+                  if (status === 'ACTIVE') return 99.0 + (Math.random() * 1.0);
+                  if (status === 'SCANNING') return 98.0 + (Math.random() * 0.5);
+                  if (status === 'STANDBY') return 0;
+                  return val; // Keep existing if unknown
+               }));
+            }
+         } catch (e) {
+            console.error("Matrix poll failed", e);
+         }
+      };
+
+      const interval = setInterval(pollMatrix, 2000); // 2s poll for live feel
       return () => clearInterval(interval);
-   }, [engineStarted]);
+   }, [engineStarted, BACKEND_URL]);
 
    // MetaMask Detection
    const detectWalletAddress = async () => {
@@ -154,10 +181,6 @@ const App: React.FC = () => {
       setExecutingWithdrawal(false);
       alert(`Withdrawal Successful: ${formatCurrency(totalUsdYield)} sent to ${targetWallet}`);
    };
-
-   // Backend Connection Logic
-   const [backendStatus, setBackendStatus] = useState<boolean>(false);
-   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
    useEffect(() => {
       const checkBackend = async () => {
