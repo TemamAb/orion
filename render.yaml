@@ -1,1 +1,29 @@
-staticPublishPath: ./public
+services:
+  # Backend Service
+  - type: web
+    name: orion-backend
+    env: node
+    root: backend
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+    healthCheckPath: /api/health
+
+  # Frontend Service
+  - type: web
+    name: orion-frontend
+    env: static
+    plan: starter
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        fromService:
+          type: web
+          name: orion-backend
+          property: url
