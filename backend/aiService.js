@@ -53,19 +53,41 @@ class AIService {
 
   async analyzeWallet(walletAddress, chain = 'ETH', transactionHistory = []) {
     try {
-      // 1. Evidence-Based Prompting
+      // 1. Evidence-Based Prompting - Sharp Definitions for "Perfect" Matrix
       const prompt = `PERFORM FORENSIC BLOCKCHAIN ANALYSIS.
       Subject: ${walletAddress} on ${chain}
       Evidence: ${JSON.stringify(transactionHistory.slice(0, 20))}
       
-      MANDATE: Classify this wallet's behavior into one of the 7 ORION STRATEGY MATRIX nodes based on the evidence provided:
-      1. "THE GHOST" (Private Transactions / Flashbots / No Mempool)
-      2. "SLOT-0 SNIPER" (First-in-block execution)
-      3. "BUNDLE MASTER" (Atomic group trading / multiple swaps tx)
-      4. "ATOMIC FLUX" (High frequency arbitrage)
-      5. "DARK RELAY" (Liquidity provider sniping)
-      6. "HIVE SYMMETRY" (Copy-trading / Mirroring other wallets)
-      7. "DISCOVERY HUNT" (New token interaction / Early alpha)
+      MANDATE: Classify this wallet's behavior into one of the 7 ORION STRATEGY MATRIX nodes. 
+      The system is designed to identify the "Perfect" set of MEV strategies. Use these strict definitions:
+
+      1. "THE GHOST" (Private Order Flow):
+         - Signature: Transactions appear in blocks without prior mempool detection.
+         - Mechanism: Uses Flashbots Protect or private RPCs to avoid front-running.
+
+      2. "SLOT-0 SNIPER" (Top-of-Block Priority):
+         - Signature: First transaction index (0-5) in the block.
+         - Mechanism: High gas priority fees to execute immediately after state updates.
+
+      3. "BUNDLE MASTER" (Sandwich & Atomic Batches):
+         - Signature: 3-transaction sequences (Buy -> Victim -> Sell) or multi-pool routing.
+         - Mechanism: Exploits slippage or price impact from other users.
+
+      4. "ATOMIC FLUX" (Spatial Arbitrage):
+         - Signature: Buy Token A on DEX X, Sell Token A on DEX Y in the same transaction.
+         - Mechanism: Risk-free profit from price discrepancies.
+
+      5. "DARK RELAY" (Just-In-Time 'JIT' Liquidity):
+         - Signature: Add Liq -> Swap executes -> Remove Liq (all in one block).
+         - Mechanism: Captures trading fees concentrated around a single large trade.
+
+      6. "HIVE SYMMETRY" (Cluster/Copy Trading):
+         - Signature: Transaction timing perfectly correlates (<1s) with known alpha wallets.
+         - Mechanism: Automated mirroring of high-performance entities.
+
+      7. "DISCOVERY HUNT" (Factory/Mempool Scanning):
+         - Signature: Interaction with contracts <5 minutes after deployment.
+         - Mechanism: Sniping liquidity additions or 'OpenTrading' methods.
 
       Return strictly strictly JSON:
       {
@@ -74,7 +96,8 @@ class AIService {
         "isBot": boolean,
         "hourlyProfitEst": "string with currency",
         "riskProfile": "LOW|MED|HIGH",
-        "evidenceTags": ["tag1", "tag2"]
+        "evidenceTags": ["tag1", "tag2"],
+        "strategyAnalysis": "One sentence explaining why this fits the definition."
       }`;
 
       // 2. Call Gemini
@@ -91,7 +114,8 @@ class AIService {
               isBot: { type: "boolean" },
               hourlyProfitEst: { type: "string" },
               riskProfile: { type: "string" },
-              evidenceTags: { type: "array", items: { type: "string" } }
+              evidenceTags: { type: "array", items: { type: "string" } },
+              strategyAnalysis: { type: "string" }
             }
           }
         }
