@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+ contents wer egiven in the app file : go and learn : do not create any things : you are not allowed ; import React, { useState, useEffect, useMemo } from 'react';
 import { ethers } from 'ethers';
 import {
    Activity, Zap, ShieldCheck, Radar,
@@ -86,7 +86,7 @@ const APEX_STRATEGY_NODES = [
 ];
 
 const App: React.FC = () => {
-   const [activeView, setActiveView] = useState<'LIVE' | 'MASTER' | 'FOLLOW' | 'MONITOR' | 'WITHDRAW' | 'INTEL' | 'PERFORMANCE' | 'AI_TERMINAL'>('MASTER');
+   const [activeView, setActiveView] = useState<'MASTER' | 'PERFORMANCE' | 'WITHDRAW' | 'INTEL'>('MASTER');
    const [sidebarExpanded, setSidebarExpanded] = useState(false);
    const [engineStarted, setEngineStarted] = useState(false);
    const [deploymentContractNumber, setDeploymentContractNumber] = useState('');
@@ -634,13 +634,9 @@ const App: React.FC = () => {
             <nav className="flex flex-col gap-4 w-full">
                <button onClick={() => setActiveView('MASTER')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'MASTER' ? 'bg-[#fbbf24]/20 text-[#fbbf24] border border-[#fbbf24]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <PieChart size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Scan</span>}
+                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Scan & Forge</span>}
                </button>
-               <button onClick={() => setActiveView('PERFORMANCE')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'PERFORMANCE' ? 'bg-[#10b981]/20 text-[#10b981] border border-[#10b981]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                  <SyncIcon size={22} className="shrink-0" />
-                  {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Forge</span>}
-               </button>
-               <button onClick={() => setActiveView('INTEL')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'INTEL' ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+               <button onClick={() => setActiveView('PERFORMANCE')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'PERFORMANCE' ? 'bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <PulseIcon size={22} className="shrink-0" />
                   {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Monitor</span>}
                </button>
@@ -648,7 +644,7 @@ const App: React.FC = () => {
                   <RefreshCw size={22} className="shrink-0" />
                   {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">Withdraw</span>}
                </button>
-               <button onClick={() => setActiveView('AI_TERMINAL')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'AI_TERMINAL' ? 'bg-[#a855f7]/20 text-[#a855f7] border border-[#a855f7]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+               <button onClick={() => setActiveView('INTEL')} className={`flex items-center gap-4 p-4 rounded-xl w-full transition-all group/item relative overflow-hidden ${activeView === 'INTEL' ? 'bg-[#a855f7]/20 text-[#a855f7] border border-[#a855f7]/30' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
                   <BrainCircuit size={22} className="shrink-0" />
                   {sidebarExpanded && <span className="text-xs font-black uppercase tracking-widest leading-none">AI Terminal</span>}
                </button>
@@ -1032,6 +1028,86 @@ const App: React.FC = () => {
                               </button>
                            </div>
                         </div>
+                     </div>
+                  </div>
+               )}
+
+               {/* Scan Results Modal */}
+               {showScanModal && (
+                  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                     <div className="bg-black/95 border border-[#06b6d4]/30 rounded-[2rem] p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                           <div className="flex items-center gap-3">
+                              <Search size={24} className="text-[#06b6d4]" />
+                              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Alpha Scan Results</h3>
+                           </div>
+                           <button
+                              onClick={() => setShowScanModal(false)}
+                              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                           >
+                              <X size={20} className="text-slate-400" />
+                           </button>
+                        </div>
+
+                        {isScanning ? (
+                           <div className="flex flex-col items-center justify-center py-12">
+                              <Loader2 size={48} className="text-[#06b6d4] animate-spin mb-4" />
+                              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Scanning for Alpha Opportunities...</p>
+                           </div>
+                        ) : scanResults ? (
+                           <div className="space-y-6">
+                              <div className="grid grid-cols-2 gap-4">
+                                 <div className="p-4 rounded-xl bg-[#06b6d4]/5 border border-[#06b6d4]/20">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Opportunities Found</span>
+                                    <span className="text-2xl font-mono font-black text-[#06b6d4]">{scanResults.opportunities?.length || 0}</span>
+                                 </div>
+                                 <div className="p-4 rounded-xl bg-[#10b981]/5 border border-[#10b981]/20">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Estimated Profit</span>
+                                    <span className="text-2xl font-mono font-black text-[#10b981]">{formatCurrency(scanResults.totalProfit || 0)}</span>
+                                 </div>
+                              </div>
+
+                              {scanResults.opportunities?.length > 0 && (
+                                 <div className="space-y-3">
+                                    <h4 className="text-sm font-black text-white uppercase tracking-widest">Detected Opportunities</h4>
+                                    {scanResults.opportunities.map((opp: any, idx: number) => (
+                                       <div key={idx} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                          <div className="flex justify-between items-start mb-2">
+                                             <span className="text-sm font-black text-white uppercase">{opp.type || 'Alpha Opportunity'}</span>
+                                             <span className="text-sm font-mono font-black text-[#10b981]">{formatCurrency(opp.profit || 0)}</span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-400 uppercase tracking-widest">{opp.description || 'High-confidence arbitrage opportunity detected'}</p>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
+
+                              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                                 <button
+                                    onClick={() => setShowScanModal(false)}
+                                    className="px-6 py-3 rounded-xl text-sm font-black uppercase tracking-widest bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+                                 >
+                                    Close
+                                 </button>
+                                 {scanResults.opportunities?.length > 0 && (
+                                    <button
+                                       onClick={() => {
+                                          setShowScanModal(false);
+                                          alert('Alpha opportunities queued for execution. Monitor the Performance view for updates.');
+                                       }}
+                                       className="px-6 py-3 rounded-xl text-sm font-black uppercase tracking-widest bg-[#10b981] text-black hover:scale-105 transition-all"
+                                    >
+                                       Execute Opportunities
+                                    </button>
+                                 )}
+                              </div>
+                           </div>
+                        ) : (
+                           <div className="text-center py-12">
+                              <Search size={48} className="text-slate-600 mx-auto mb-4" />
+                              <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No scan results available</p>
+                           </div>
+                        )}
                      </div>
                   </div>
                )}
