@@ -2,11 +2,11 @@ const winston = require('winston');
 const blockchainService = require('./blockchain');
 const aiService = require('./aiService');
 
-// PHASE 2-3: Import MEV and Advanced strategies
-const { GhostTrader } = require('../src/core/strategies/GhostTrader');
-const { BlockSniper } = require('../src/core/strategies/BlockSniper');
-const { JITLiquidity } = require('../src/core/strategies/JITLiquidity');
-const { CopyTrader } = require('../src/core/strategies/CopyTrader');
+// PHASE 2-3: Import MEV and Advanced strategies - Temporarily disabled due to TypeScript import issue
+// const { GhostTrader } = require('../src/core/strategies/GhostTrader');
+// const { BlockSniper } = require('../src/core/strategies/BlockSniper');
+// const { JITLiquidity } = require('../src/core/strategies/JITLiquidity');
+// const { CopyTrader } = require('../src/core/strategies/CopyTrader');
 
 // Logger setup specific to the Bot Orchestrator
 const logger = winston.createLogger({
@@ -31,11 +31,11 @@ const logger = winston.createLogger({
 
 class BotOrchestrator {
     constructor() {
-        // PHASE 2-3: Initialize MEV and Advanced strategies
-        this.ghostTrader = new GhostTrader();
-        this.blockSniper = new BlockSniper();
-        this.jitLiquidity = new JITLiquidity();
-        this.copyTrader = new CopyTrader();
+        // PHASE 2-3: Initialize MEV and Advanced strategies - Temporarily disabled
+        // this.ghostTrader = new GhostTrader();
+        // this.blockSniper = new BlockSniper();
+        // this.jitLiquidity = new JITLiquidity();
+        // this.copyTrader = new CopyTrader();
 
         // TIER 1: SCANNERS - Enhanced for MEV and Advanced detection
         this.scanners = [
@@ -130,7 +130,7 @@ class BotOrchestrator {
                         volatilityIndex: (Date.now() % 100) / 100,
                         mempoolDepth: await this.getMempoolDepth(),
                         mevCompetition: await this.assessMevCompetition(),
-                        blockCongestion: this.blockSniper ? this.blockSniper.getStatus().networkCongestion : 0
+                        blockCongestion: 0 // Temporarily disabled
                     };
 
                     // Call AI service for strategy optimization
@@ -206,8 +206,8 @@ class BotOrchestrator {
             const marketConditions = {
                 gasPrice: await blockchainService.getGasPrice(),
                 mempoolDepth: await this.getMempoolDepth(),
-                networkCongestion: this.blockSniper ? this.blockSniper.getStatus().networkCongestion : 0,
-                ghostTraderAvailable: this.ghostTrader ? this.ghostTrader.isOperational() : false,
+                networkCongestion: 0, // Temporarily disabled
+                ghostTraderAvailable: false, // Temporarily disabled
                 blockCompetition: await this.assessBlockCompetition(),
                 largeTradesPending: await this.checkLargeTradesPending(),
                 alphaWalletActivity: await this.checkAlphaWalletActivity()
@@ -537,8 +537,8 @@ class BotOrchestrator {
             scanners: this.scanners,
             executors: this.executors,
             mevStrategies: {
-                ghostTrader: this.ghostTrader ? this.ghostTrader.getStatus() : { enabled: false },
-                blockSniper: this.blockSniper ? this.blockSniper.getStatus() : { operational: false }
+                ghostTrader: { enabled: false }, // Temporarily disabled
+                blockSniper: { operational: false } // Temporarily disabled
             },
             metrics: {
                 totalHits: this.scanners.reduce((acc, s) => acc + s.hits, 0),
