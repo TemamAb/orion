@@ -1,4 +1,4 @@
-// Import required modules
+don // Import required modules
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -40,10 +40,53 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['https://your-frontend-domain.com'])
-    : ['http://localhost:3000', 'http://localhost:5173'], // Allow local development
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // In production, allow the frontend domain and any subdomain
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [
+        'https://orion-frontend.onrender.com',
+        'https://orion-frontend-*.onrender.com',
+        /\.onrender\.com$/,
+        /\.vercel\.app$/,
+        /\.netlify\.app$/
+      ];
+
+      // Check if origin matches any allowed pattern
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        if (typeof allowedOrigin === 'string') {
+          return origin === allowedOrigin || origin.includes('onrender.com');
+        }
+        return allowedOrigin.test(origin);
+      });
+
+      if (isAllowed) {
+        return callback(null, true);
+      } else {
+        console.warn(`CORS: Blocked origin ${origin}`);
+        return callback(new Error('Not allowed by CORS'));
+      }
+    } else {
+      // Development: allow localhost
+      const allowedDevOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173'
+      ];
+
+      if (allowedDevOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
@@ -158,6 +201,43 @@ app.get('/api/matrix/status', (req, res) => {
 app.get('/api/bots/status', (req, res) => {
   const botStatus = botOrchestrator.getSystemStatus();
   res.json(botStatus);
+});
+
+// Start bot system endpoint
+app.post('/api/bots/start', (req, res) => {
+  try {
+    if (botOrchestrator.isRunning) {
+      return res.json({ success: true, message: 'Bot system already running', timestamp: new Date() });
+    }
+
+    if (!aiService.isReady) {
+      return res.status(503).json({
+        error: 'AI service not ready',
+        message: 'Cannot start bot system without AI service'
+      });
+    }
+
+    botOrchestrator.start();
+    res.json({ success: true, message: 'Bot system started', timestamp: new Date() });
+  } catch (error) {
+    logger.error('Failed to start bot system:', error);
+    res.status(500).json({ error: 'Failed to start bot system' });
+  }
+});
+
+// Stop bot system endpoint
+app.post('/api/bots/stop', (req, res) => {
+  try {
+    if (!botOrchestrator.isRunning) {
+      return res.json({ success: true, message: 'Bot system already stopped', timestamp: new Date() });
+    }
+
+    botOrchestrator.stop();
+    res.json({ success: true, message: 'Bot system stopped', timestamp: new Date() });
+  } catch (error) {
+    logger.error('Failed to stop bot system:', error);
+    res.status(500).json({ error: 'Failed to stop bot system' });
+  }
 });
 
 // Performance stats endpoint
@@ -454,9 +534,13 @@ async function initializeServices() {
     blockchainService.isConnected = true;
     logger.info('Blockchain service initialized successfully');
 
-    // Activate Tri-Tier Bot System
-    botOrchestrator.start();
-    logger.info('Tri-Tier Bot System activated');
+    // Only activate Tri-Tier Bot System if AI service is also ready
+    if (aiService.isReady) {
+      botOrchestrator.start();
+      logger.info('Tri-Tier Bot System activated');
+    } else {
+      logger.warn('Bot System not started - AI service not ready. System will run in limited mode.');
+    }
   } catch (error) {
     logger.error('Blockchain service initialization failed:', error);
     logger.error('This may be due to invalid PIMLICO_API_KEY, RPC URLs, or network connectivity');

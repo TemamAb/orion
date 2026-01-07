@@ -113,6 +113,12 @@ class AIService {
   // Health monitoring and automatic recovery
   async performHealthCheck() {
     try {
+      // Skip health check if AI is not initialized
+      if (!this.ai) {
+        this.healthMetrics.isHealthy = false;
+        return;
+      }
+
       const startTime = Date.now();
       // Simple health check - try to generate a basic response
       const model = this.ai.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -266,8 +272,8 @@ class AIService {
     this.healthMetrics.totalRequests++;
 
     try {
-      // Check if AI is healthy, otherwise use fallback
-      if (!this.isReady || !this.healthMetrics.isHealthy) {
+      // Check if AI is healthy and initialized, otherwise use fallback
+      if (!this.isReady || !this.healthMetrics.isHealthy || !this.ai) {
         logger.warn('AI service unavailable, using fallback strategy optimization');
         const fallbackResult = this.fallbackStrategies.get('optimizeStrategy')(walletData, marketConditions);
         this.healthMetrics.successfulRequests++;

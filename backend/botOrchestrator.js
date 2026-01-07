@@ -494,6 +494,79 @@ class BotOrchestrator {
     }
 
     /**
+     * PHASE 2: Execute JIT Liquidity strategy
+     */
+    async executeJITLiquidity(executor) {
+        logger.info(`${executor.id} executing JIT Liquidity strategy`);
+
+        try {
+            // Create mock JIT opportunity for testing
+            const mockOpportunity = {
+                tokenPair: { base: 'USDC', quote: 'WETH' },
+                dexes: [{ name: 'Uniswap V3', router: '0x...', chainId: 1 }],
+                largeTradeDetected: true,
+                liquidityInjection: '5000000', // 5M USDC
+                expectedProfit: '1500',
+                gasCost: '300000',
+                netProfit: '1200',
+                confidence: 0.8,
+                riskLevel: 'MEDIUM',
+                timestamp: new Date()
+            };
+
+            // Simulate JIT liquidity provision before large trade
+            const result = await blockchainService.executeJITLiquidity(mockOpportunity);
+
+            if (result.success) {
+                logger.info(`${executor.id} JIT Liquidity successful. Injected: ${mockOpportunity.liquidityInjection}, Profit: ${result.profit}`);
+            } else {
+                logger.warn(`${executor.id} JIT Liquidity failed: ${result.error}`);
+            }
+
+        } catch (error) {
+            logger.error(`${executor.id} JIT Liquidity execution error:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * PHASE 2: Execute Copy Trader strategy
+     */
+    async executeCopyTrader(executor) {
+        logger.info(`${executor.id} executing Copy Trader strategy`);
+
+        try {
+            // Create mock alpha wallet trade for testing
+            const mockAlphaTrade = {
+                alphaWallet: '0x1234...abcd',
+                tokenPair: { base: 'USDC', quote: 'WETH' },
+                dexes: [{ name: 'Uniswap V3', router: '0x...', chainId: 1 }],
+                tradeAmount: '2000000', // 2M USDC
+                tradeDirection: 'BUY',
+                expectedProfit: '2000',
+                gasCost: '250000',
+                netProfit: '1750',
+                confidence: 0.85,
+                riskLevel: 'LOW',
+                timestamp: new Date()
+            };
+
+            // Simulate copying alpha wallet trade
+            const result = await blockchainService.executeCopyTrade(mockAlphaTrade);
+
+            if (result.success) {
+                logger.info(`${executor.id} Copy Trader successful. Copied: ${mockAlphaTrade.alphaWallet}, Profit: ${result.profit}`);
+            } else {
+                logger.warn(`${executor.id} Copy Trader failed: ${result.error}`);
+            }
+
+        } catch (error) {
+            logger.error(`${executor.id} Copy Trader execution error:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Execute standard arbitrage (existing logic)
      */
     async executeStandardArbitrage(executor) {
@@ -501,7 +574,7 @@ class BotOrchestrator {
 
         // Existing arbitrage logic
         const tradeParams = {
-            tokenIn: '0xA0b86a33E6441e88C5F2712C3E9b74Ae1f0f2c4d', // USDC
+            tokenIn: '0xA0b86a33e6441e88C5F2712C3E9b74Ae1f0f2c4d', // USDC (checksummed)
             tokenOut: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
             amount: 1000000, // 1M USDC (6 decimals)
             dexPath: ['Uniswap'] // DEX path for arbitrage

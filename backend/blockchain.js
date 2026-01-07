@@ -650,6 +650,74 @@ class BlockchainService {
     return ethers.formatEther(bal);
   }
 
+  // Mock method for pending transactions (for sandwich attacks)
+  async getPendingTransactions() {
+    // In production, this would query the mempool
+    // For now, return mock pending transactions
+    return [
+      {
+        hash: '0x' + Math.random().toString(16).substr(2, 64),
+        to: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D', // Uniswap V2 Router
+        value: '5000000000000000000', // 5 ETH
+        gasPrice: '20000000000'
+      },
+      {
+        hash: '0x' + Math.random().toString(16).substr(2, 64),
+        to: '0xE592427A0AEce92De3Edee1F18E0157C05861564', // Uniswap V3 Router
+        value: '2000000000000000000', // 2 ETH
+        gasPrice: '25000000000'
+      }
+    ];
+  }
+
+  // Mock method for JIT liquidity execution
+  async executeJITLiquidity(opportunity) {
+    logger.info(`Executing JIT Liquidity: ${JSON.stringify(opportunity)}`);
+
+    // Mock successful execution
+    return {
+      success: true,
+      profit: opportunity.expectedProfit || '1200',
+      liquidityInjected: opportunity.liquidityInjection || '5000000',
+      transactionHash: '0x' + Math.random().toString(16).substr(2, 64)
+    };
+  }
+
+  // Mock method for copy trading execution
+  async executeCopyTrade(trade) {
+    logger.info(`Executing Copy Trade: ${JSON.stringify(trade)}`);
+
+    // Mock successful execution
+    return {
+      success: true,
+      profit: trade.expectedProfit || '1750',
+      copiedWallet: trade.alphaWallet,
+      transactionHash: '0x' + Math.random().toString(16).substr(2, 64)
+    };
+  }
+
+  // Mock method for sandwich attack execution
+  async executeSandwichAttack(params) {
+    logger.info(`Executing Sandwich Attack: ${JSON.stringify(params)}`);
+
+    // Mock successful execution
+    return {
+      success: true,
+      profit: params.expectedProfit || '2500',
+      victimTx: params.victimTx,
+      transactionHash: '0x' + Math.random().toString(16).substr(2, 64)
+    };
+  }
+
+  // Mock method for optimal gas price
+  async getOptimalGasPrice() {
+    return {
+      gasPrice: '25000000000', // 25 gwei
+      maxFeePerGas: '50000000000',
+      maxPriorityFeePerGas: '2000000000'
+    };
+  }
+
   async verifyOnChainStatus(txHash) {
     try {
       logger.info(`Auditing Transaction on-chain: ${txHash}`);

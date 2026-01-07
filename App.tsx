@@ -283,6 +283,8 @@ const AppContent: React.FC = () => {
    const [autoWithdrawThreshold, setAutoWithdrawThreshold] = useState(2452.84); // 1 ETH default
    const [showWithdrawConfirmation, setShowWithdrawConfirmation] = useState(false);
    const [showMonitorConfirmation, setShowMonitorConfirmation] = useState(false);
+   const [startingBots, setStartingBots] = useState(false);
+   const [stoppingBots, setStoppingBots] = useState(false);
 
    // Scan for Alpha functionality
    const [isScanning, setIsScanning] = useState(false);
@@ -300,77 +302,17 @@ const AppContent: React.FC = () => {
    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('IDLE');
    const [serverStatus, setServerStatus] = useState<any>(null);
 
-   // Exact Discovery Logic:
-   // 1. Check build-time env var
-   // 2. Fallback to localhost for dev
-   // 3. AUTO-DISCOVER if running on Render production
-   // Omni-Discovery Sentinel: Check localStorage, then neural patterns
+   // Simplified Discovery Logic:
+   // 1. Check manual override from localStorage
+   // 2. Use build-time env var (VITE_BACKEND_URL)
+   // 3. Fallback to localhost for dev
    const [manualBackendUrl, setManualBackendUrl] = useState(localStorage.getItem('ORION_BACKEND_OVERRIDE') || '');
    let rawBackendUrl = manualBackendUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-
-   if (!manualBackendUrl && typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-      if (rawBackendUrl.includes('localhost') || !rawBackendUrl) {
-         const currentHost = window.location.hostname;
-         const protocol = window.location.protocol;
-         const parts = currentHost.split('.')[0].split('-');
-         const suffix = parts.length > 1 ? parts[parts.length - 1] : '';
-         const baseName = parts[0];
-
-         if (currentHost.includes('-frontend')) {
-            rawBackendUrl = `${protocol}//${currentHost.replace('-frontend', '-backend')}`;
-         } else {
-            // Pattern B: orion-xgnh -> orion-backend-xgnh
-            rawBackendUrl = suffix
-               ? `${protocol}//${baseName}-backend-${suffix}.onrender.com`
-               : `${protocol}//${baseName}-backend.onrender.com`;
-         }
-         console.log(`[Orion Architecture] Omni-Discovery (Alpha Pattern): ${rawBackendUrl}`);
-      }
-   }
 
    // Normalize URL
    const BACKEND_URL = rawBackendUrl.replace(/\/$/, "");
 
-   // Brute-Force Omni-Scan
-   useEffect(() => {
-      if (connectionStatus === 'OFFLINE' && !manualBackendUrl && typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
-         const bruteForceDiscovery = async () => {
-            const currentHost = window.location.hostname;
-            const protocol = window.location.protocol;
-            const parts = currentHost.split('.')[0].split('-');
-            const suffix = parts.length > 1 ? parts[parts.length - 1] : '';
-            const baseName = parts[0];
 
-            const candidates = [
-               `${protocol}//${currentHost.replace(suffix, 'backend-' + suffix)}`,
-               `${protocol}//${baseName}-backend-${suffix}.onrender.com`,
-               `${protocol}//${baseName}-backend.onrender.com`,
-               `${protocol}//orion-backend.onrender.com`,
-               `${protocol}//orion-backend-${suffix}.onrender.com`
-            ];
-
-            console.log("[Orion Architecture] Primary Discovery Failed. Initiating Brute-Force Omni-Scan...");
-            setConnectionStatus('SCANNING');
-
-            for (const url of candidates) {
-               if (url === window.location.origin) continue; // Skip self
-               try {
-                  const probe = await fetch(`${url}/api/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
-                  const isJson = probe.headers.get("content-type")?.includes("application/json");
-                  if (probe.ok && isJson) {
-                     console.log(`[Orion Architecture] Omni-Scan SUCCESS: Core found at ${url}`);
-                     localStorage.setItem('ORION_BACKEND_OVERRIDE', url);
-                     window.location.reload();
-                     return;
-                  }
-               } catch (e) { }
-            }
-            console.error("[Orion Architecture] Omni-Scan Failed to locate Enterprise Core. Manual [SET] required.");
-            setConnectionStatus('OFFLINE'); // Reset to offline if scan fails
-         };
-         bruteForceDiscovery();
-      }
-   }, [connectionStatus, manualBackendUrl]);
 
    console.log(`[Orion Architecture] Target Core: ${BACKEND_URL}`);
 
@@ -522,6 +464,76 @@ const AppContent: React.FC = () => {
          addToast('error', 'Alpha scan error occurred. Please try again later.');
       } finally {
          setIsScanning(false);
+      }
+   };
+
+   const handleStartBots = async () => {
+      if (startingBots) return;
+      setStartingBots(true);
+
+      try {
+         console.log("[Orion Bot Control] Starting bot system...");
+         const res = await fetch(`${BACKEND_URL}/api/bots/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+         });
+
+         if (res.ok) {
+            const data = await res.json();
+            console.log("[Orion Bot Control] Bot system started successfully:", data);
+            addToast('success', 'Bot system started successfully!');
+            // Refresh bot status
+            if (engineStarted) {
+               const statusRes = await fetch(`${BACKEND_URL}/api/bots/status`);
+               if (statusRes.ok) {
+                  const statusData = await statusRes.json();
+                  setBotFleet(statusData);
+               }
+            }
+         } else {
+            console.error("[Orion Bot Control] Failed to start bot system");
+            addToast('error', 'Failed to start bot system. Please check backend connection.');
+         }
+      } catch (error) {
+         console.error("[Orion Bot Control] Error starting bots:", error);
+         addToast('error', 'Error starting bot system. Please try again later.');
+      } finally {
+         setStartingBots(false);
+      }
+   };
+
+   const handleStopBots = async () => {
+      if (stoppingBots) return;
+      setStoppingBots(true);
+
+      try {
+         console.log("[Orion Bot Control] Stopping bot system...");
+         const res = await fetch(`${BACKEND_URL}/api/bots/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+         });
+
+         if (res.ok) {
+            const data = await res.json();
+            console.log("[Orion Bot Control] Bot system stopped successfully:", data);
+            addToast('success', 'Bot system stopped successfully!');
+            // Refresh bot status
+            if (engineStarted) {
+               const statusRes = await fetch(`${BACKEND_URL}/api/bots/status`);
+               if (statusRes.ok) {
+                  const statusData = await statusRes.json();
+                  setBotFleet(statusData);
+               }
+            }
+         } else {
+            console.error("[Orion Bot Control] Failed to stop bot system");
+            addToast('error', 'Failed to stop bot system. Please check backend connection.');
+         }
+      } catch (error) {
+         console.error("[Orion Bot Control] Error stopping bots:", error);
+         addToast('error', 'Error stopping bot system. Please try again later.');
+      } finally {
+         setStoppingBots(false);
       }
    };
 
@@ -1398,11 +1410,43 @@ const AppContent: React.FC = () => {
 
                            {/* TRI-TIER BOT FLEET MONITORING */}
                            <div className="flex flex-col gap-6 mt-8">
-                              <div className="flex items-center gap-3">
-                                 <div className="p-2 bg-slate-800 rounded-lg">
-                                    <Layers size={14} className="text-white" />
+                              <div className="flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-slate-800 rounded-lg">
+                                       <Layers size={14} className="text-white" />
+                                    </div>
+                                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Tri-Tier Bot Fleet</h3>
                                  </div>
-                                 <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Tri-Tier Bot Fleet</h3>
+                                 <div className="flex gap-3">
+                                    <button
+                                       onClick={handleStartBots}
+                                       disabled={startingBots || !engineStarted}
+                                       className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                                          startingBots
+                                             ? 'bg-blue-500/20 text-blue-400 cursor-wait'
+                                             : !engineStarted
+                                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                : 'bg-[#10b981] text-black hover:scale-105'
+                                       }`}
+                                    >
+                                       {startingBots ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                       {startingBots ? 'STARTING...' : 'START BOTS'}
+                                    </button>
+                                    <button
+                                       onClick={handleStopBots}
+                                       disabled={stoppingBots || !engineStarted}
+                                       className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                                          stoppingBots
+                                             ? 'bg-red-500/20 text-red-400 cursor-wait'
+                                             : !engineStarted
+                                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                : 'bg-red-500 text-black hover:scale-105'
+                                       }`}
+                                    >
+                                       {stoppingBots ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                                       {stoppingBots ? 'STOPPING...' : 'STOP BOTS'}
+                                    </button>
+                                 </div>
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
