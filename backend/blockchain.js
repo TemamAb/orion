@@ -609,12 +609,16 @@ class BlockchainService {
     try {
       const feeData = await this.provider.getFeeData();
       return {
-        gasPrice: feeData.gasPrice?.toString(),
+        gasPrice: feeData.gasPrice?.toString() || "20000000000", // 20 gwei fallback
         mode: "GASLESS_SPONSORED"
       };
     } catch (error) {
-      logger.warn('Failed to get gas price:', error.message);
-      return null;
+      logger.warn('Failed to get gas price from RPC, using fallback:', error.message);
+      // Return a mock gas price for development/demo purposes
+      return {
+        gasPrice: "20000000000", // 20 gwei
+        mode: "FALLBACK_MODE"
+      };
     }
   }
 

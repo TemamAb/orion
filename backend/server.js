@@ -79,6 +79,14 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// AI Health metrics endpoint
+app.get('/api/ai/health', (req, res) => {
+  res.json({
+    health: aiService.getHealthMetrics(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Learning curve endpoints
 app.get('/api/learning/metrics', (req, res) => {
   try {

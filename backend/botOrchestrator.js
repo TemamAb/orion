@@ -135,7 +135,11 @@ class BotOrchestrator {
 
                     // Call AI service for strategy optimization
                     const aiOptimization = await aiService.optimizeStrategy({}, marketConditions);
-                    aiDecision = aiOptimization.expectedProfit > 0.05 ? "EXECUTE" : "HOLD"; // Lower threshold for MEV
+                    // Handle expectedProfit as string (e.g., "0.3%") or number
+                    const profitValue = typeof aiOptimization.expectedProfit === 'string'
+                      ? parseFloat(aiOptimization.expectedProfit.replace('%', '')) / 100
+                      : aiOptimization.expectedProfit;
+                    aiDecision = profitValue > 0.05 ? "EXECUTE" : "HOLD"; // Lower threshold for MEV
                     logger.info(`AI Decision: ${aiDecision} | Strategy: ${selectedStrategy} | Expected Profit: ${aiOptimization.expectedProfit}`);
                 } catch (error) {
                     logger.warn('AI optimization failed, defaulting to HOLD:', error.message);
@@ -259,6 +263,14 @@ class BotOrchestrator {
         // In production, query actual mempool
         // For now, simulate based on time
         return Math.floor(Math.random() * 200) + 50; // 50-250 pending txs
+    }
+
+    /**
+     * Assess MEV competition
+     */
+    async assessMevCompetition() {
+        // Simulate MEV competition level
+        return Math.random() * 100; // 0-100 competition level
     }
 
     /**

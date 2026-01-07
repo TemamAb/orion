@@ -1,0 +1,211 @@
+# Orion Arbitrage Flash Loan App - Full Blueprint
+
+## Overview
+Orion is an enterprise-grade arbitrage flash loan trading system built with TypeScript, featuring AI-powered wallet strategy analysis, multi-chain support, and automated trading execution. The system uses a modular architecture with clear separation of concerns.
+
+## Architecture Overview
+- **Frontend**: React/Vite-based dashboard (minimal in current codebase)
+- **Backend**: Node.js/Express API with modular TypeScript core
+- **Database**: MongoDB with Mongoose ODM
+- **AI**: Google Gemini integration for strategy analysis
+- **Blockchain**: Multi-chain support (ETH, Polygon, Arbitrum, Base, Avalanche)
+- **Orchestration**: Tri-Tier bot system (Scanners, Captain, Executors)
+
+## Module Breakdown
+
+### 1. Backend Module
+**Purpose**: Enterprise-grade backend service for arbitrage trading with AI analysis and flash loan execution.
+
+**Key Features**:
+- AI-powered wallet strategy analysis using Gemini AI
+- Flash loan execution via Aave and other providers
+- Wallet mirroring for copying successful strategies
+- Multi-chain support (ETH, Base, Arbitrum, Solana)
+- Risk management and profit/loss monitoring
+- Real-time monitoring and performance tracking
+- Enterprise security with multi-sig support
+
+**Files**:
+- `backend/server.js`: Main Express server with 20+ API endpoints for health, strategies, trades, blockchain info, and bot control. Initializes AI, blockchain, and bot orchestrator services.
+- `backend/package.json`: Dependencies include Express, Mongoose, Redis, Winston, Ethers, Google GenAI, rate limiting, compression, validation.
+- `backend/models/Strategy.js`: Mongoose schema for wallet strategies with win rate, PnL, percentile, confidence, risk rating, strategies array, performance metrics, and copied trades.
+- `backend/models/Trade.js`: Mongoose schema for trades with strategy reference, wallet, chain, type, status, amounts, tokens, dex path, profit, gas, slippage, risk level, copied from data.
+- `backend/middleware/security.js`: Comprehensive security middleware with rate limiting (15min windows), input validation/sanitization, CORS, security headers, API key auth, request logging.
+- `backend/tests/api.test.js`: Jest tests covering security middleware, rate limiting, input validation, authentication, API endpoints, and integration tests.
+- `backend/README.md`: Detailed documentation of features, architecture, API endpoints, configuration, security, monitoring, testing, and deployment.
+
+### 2. Core Module
+
+#### 2.1 AI Submodule
+**Purpose**: Unified AI services for wallet analysis, token auditing, and strategy optimization using Google Gemini.
+
+**Key Features**:
+- Forensic blockchain analysis classifying wallets into 7 ORION strategy matrix nodes
+- Token security auditing for rug pull risks and liquidity depth
+- Strategy optimization based on market conditions
+- Intelligent caching with 5-minute TTL
+- Exponential backoff retry logic
+
+**Files**:
+- `src/core/ai/index.ts`: AIService class implementing wallet analysis, token audit, strategy optimization with Gemini AI prompts and JSON schema validation.
+- `src/core/ai/types.ts`: TypeScript interfaces for AIConfig, IAIService, WalletAnalysis, TokenAudit, StrategyOptimization.
+- `src/core/ai/specialists/ArbitrageAISpecialist.ts`: AI specialist for arbitrage opportunities (imports only, implementation pending).
+- `src/core/ai/specialists/StrategyForger.ts`: Advanced strategy forger that identifies top performers, reverse engineers strategies, adapts for execution, calibrates risk, and tracks learning curves with profit/day matching.
+
+#### 2.2 Blockchain Submodule
+**Purpose**: Multi-chain arbitrage engine for finding cross-chain and same-chain opportunities.
+
+**Key Features**:
+- Support for 5 chains: Ethereum, Polygon, Arbitrum, Base, Avalanche
+- 8 major DEXes per chain (Uniswap, SushiSwap, Curve, etc.)
+- Cross-chain bridges: Stargate, Across, Hop, LayerZero
+- Direct and triangular arbitrage detection
+- Volume-weighted price aggregation
+- Gas cost estimation and execution time prediction
+- Risk assessment for arbitrage opportunities
+
+**Files**:
+- `src/core/blockchain/index.ts`: Empty index file.
+- `src/core/blockchain/MultiChainArbitrageEngine.ts`: Main engine for finding cross-chain arbitrage, same-chain multi-DEX arbitrage, analyzing chain pairs, querying DEX prices, assessing risks.
+
+#### 2.3 Orchestrator Submodule
+**Purpose**: Tri-Tier bot orchestration system for automated trading execution.
+
+**Key Features**:
+- **Tier 1 (Scanners)**: High-frequency mempool/DEX monitoring
+- **Tier 2 (Captain)**: AI-powered decision making and gas optimization
+- **Tier 3 (Executors)**: Flash loan execution and transaction signing
+- Dynamic scaling based on market conditions
+- Real-time status monitoring and metrics
+
+**Files**:
+- `src/core/orchestrator/index.ts`: BotOrchestrator class implementing the tri-tier system with orchestration loop, opportunity scanning, captain decisions, and executor dispatching.
+- `src/core/orchestrator/AdaptiveTradingSwarm.ts`: Evolutionary algorithm for trading agents with fitness evaluation, selection, crossover, mutation, and adaptive evolution cycles.
+
+#### 2.4 Strategies Submodule
+**Purpose**: Specialized trading strategies for different market conditions and opportunities.
+
+**Key Features**:
+- **BlockSniper**: Priority block positioning using gas auctions for top slots
+- **CopyTrader**: Social mirror trading copying alpha wallets with <1s precision
+- **GhostTrader**: Private order flow using Flashbots and private RPCs
+- **JITLiquidity**: Just-in-time liquidity provision capturing impermanent loss
+
+**Files**:
+- `src/core/strategies/BlockSniper.ts`: Gas auction system for securing top block positions (0-5) with timing optimization and network congestion analysis.
+- `src/core/strategies/CopyTrader.ts`: Alpha wallet monitoring and copying with correlation analysis, risk controls, and performance attribution.
+- `src/core/strategies/GhostTrader.ts`: Invisible arbitrage using Flashbots relay and private channels to bypass mempool detection.
+- `src/core/strategies/JITLiquidity.ts`: Atomic add/swap/remove sequences to profit from impermanent loss in large trades.
+
+### 3. Infrastructure Module
+
+#### 3.1 API Submodule
+**Purpose**: RESTful API routes for strategy and trade management.
+
+**Key Features**:
+- CRUD operations for strategies
+- Standardized API responses with success/error handling
+- TypeScript interfaces for type safety
+
+**Files**:
+- `src/infrastructure/api/routes/strategies.ts`: Express routes for GET/POST/PUT/DELETE strategies with Mongoose integration and error handling.
+
+#### 3.2 Database Submodule
+**Purpose**: Data persistence layer with MongoDB and Mongoose.
+
+**Key Features**:
+- Connection management with health checks
+- Schema definitions with validation
+- Performance indexes
+- Error handling and reconnection logic
+
+**Files**:
+- `src/infrastructure/database/index.ts`: DatabaseService class for MongoDB connection, disconnection, and health monitoring.
+- `src/infrastructure/database/models/Strategy.ts`: Mongoose schema for strategies with performance tracking and indexes.
+
+#### 3.3 Security Submodule
+**Purpose**: Comprehensive security middleware for API protection.
+
+**Key Features**:
+- API key authentication
+- JWT authentication (placeholder)
+- Request logging and monitoring
+- CORS configuration
+- Input sanitization
+- Security headers
+- Rate limiting with configurable windows
+- IP whitelisting (optional)
+- Request size limiting
+
+**Files**:
+- `src/infrastructure/security/middleware.ts`: SecurityMiddleware class with all security features and utilities.
+
+#### 3.4 Monitoring Submodule
+**Purpose**: Logging and metrics collection (referenced but not detailed in current codebase).
+
+### 4. Shared Module
+**Purpose**: Common utilities, types, and dependency injection container.
+
+**Key Features**:
+- TypeScript type definitions for all domains
+- Dependency injection with Inversify
+- Service registration and initialization
+- Configuration management
+
+**Files**:
+- `src/shared/container.ts`: ServiceContainer class with Inversify DI for Database, AI, Blockchain, and BotOrchestrator services.
+- `src/shared/types/index.ts`: Comprehensive type definitions for Wallet, Trade, Strategy, Blockchain, Config, API, Bot orchestrator interfaces.
+- `src/shared/utils/index.ts`: Utility functions (referenced but not shown).
+- `src/shared/types/enhanced.ts`: Enhanced types for advanced features (referenced but not shown).
+
+### 5. Services Module
+**Purpose**: External service integrations, primarily AI services.
+
+**Key Features**:
+- Google Gemini AI integration
+- Wallet intelligence decryption
+- Token security auditing
+- Apex reliability verification
+- Best match filtering
+
+**Files**:
+- `services/geminiService.ts`: Gemini AI service functions for wallet verification, token audit, and filtering with retry logic and fallback data.
+
+## Key Technologies
+- **Runtime**: Node.js 18+
+- **Language**: TypeScript 5.8+
+- **Framework**: Express.js
+- **Database**: MongoDB with Mongoose
+- **Cache**: Redis
+- **AI**: Google Gemini 1.5 Flash/3.0
+- **Blockchain**: Ethers.js, multi-chain RPC
+- **Security**: Helmet, rate limiting, input validation
+- **Testing**: Jest with TypeScript
+- **Deployment**: Docker, CI/CD with GitHub Actions
+
+## Trading Strategies Matrix
+The system implements 7 core strategies:
+1. **THE GHOST**: Private order flow via Flashbots
+2. **SLOT-0 SNIPER**: Top-of-block priority execution
+3. **BUNDLE MASTER**: Sandwich & atomic batch trading
+4. **ATOMIC FLUX**: Cross-DEX arbitrage
+5. **DARK RELAY**: Just-in-time liquidity
+6. **HIVE SYMMETRY**: Smart wallet mirroring
+7. **DISCOVERY HUNT**: Alpha signature scouting
+
+## Performance Characteristics
+- **Scalability**: Horizontal scaling with multiple instances
+- **Security**: Enterprise-grade with multi-sig and audit trails
+- **Reliability**: Comprehensive error handling and fallbacks
+- **Monitoring**: Real-time metrics and health checks
+- **AI Integration**: Intelligent decision making with learning curves
+
+## Deployment Architecture
+- **Containerized**: Docker with multi-stage builds
+- **Orchestration**: Docker Compose for local development
+- **Load Balancing**: Nginx reverse proxy
+- **Database**: MongoDB with Redis caching
+- **Monitoring**: Prometheus metrics collection
+- **CI/CD**: GitHub Actions automation
+
+This blueprint provides a complete overview of the Orion arbitrage flash loan app's modular architecture, features, and implementation details.
