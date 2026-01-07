@@ -40,7 +40,7 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://your-frontend-domain.com'] // Replace with actual domain
+    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['https://your-frontend-domain.com'])
     : ['http://localhost:3000', 'http://localhost:5173'], // Allow local development
   credentials: true
 }));
