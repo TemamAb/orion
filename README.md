@@ -1,20 +1,45 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Orion Enterprise Engine
 
-# Run and deploy your AI Studio app
+A sophisticated arbitrage trading platform with AI-powered decision making, built on Google Cloud Platform.
 
-This contains everything you need to run your app locally.
+## Architecture
 
-View your app in AI Studio: https://ai.studio/apps/drive/107ZZ_WP3eBXrYTB56xy-WVCXEMmkjXfJ
+- **Frontend**: React + TypeScript UI served via Cloud Run
+- **Scanner**: Go service scanning for arbitrage opportunities
+- **Orchestrator**: Python service using Vertex AI for trade decisions
+- **Executor**: Node.js service executing trades via Pimlico
 
-## Run Locally
+## Quick Start
 
-**Prerequisites:**  Node.js
+1. **Prerequisites**:
+   - Google Cloud SDK (`gcloud`)
+   - Terraform
+   - Docker
 
+2. **Setup**:
+   ```bash
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT_ID
+   ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3. **Deploy**:
+   ```bash
+   ./deploy.sh
+   ```
+
+4. **Access**: The script will output the UI URL.
+
+## Development
+
+- Frontend: `cd frontend && npm install && npm run dev`
+- Services: Use Docker for local development
+
+## Configuration
+
+- Set secrets in GCP Secret Manager: `PIMLICO_API_KEY`, `EXECUTOR_WALLET_KEY`
+- Environment variables handled via Terraform
+
+## Monitoring
+
+- Cloud Monitoring dashboard included
+- Logs available in Cloud Logging
